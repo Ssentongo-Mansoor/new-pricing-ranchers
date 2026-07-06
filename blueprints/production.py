@@ -32,6 +32,14 @@ bp = Blueprint("production", __name__, url_prefix="/production")
 @bp.before_request
 @login_required
 def _guard():
+    # Production lives in its own app since 6 Jul 2026 (same database,
+    # separate deployment). This deployment serves the screens only when
+    # PRODUCTION_UI=1; everywhere else they 404 server-side — hidden nav
+    # alone would leave the routes reachable by URL. The 404 comes first so
+    # the module's existence is not even revealed by a 403.
+    from flask import current_app
+    if not current_app.config.get("PRODUCTION_UI"):
+        abort(404)
     if not has_perm(current_user, "view_production"):
         abort(403)
 

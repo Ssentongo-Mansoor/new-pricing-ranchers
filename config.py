@@ -63,3 +63,10 @@ class Config:
     # Pricing defaults (also stored as editable Settings; these are fallbacks).
     DEFAULT_VAT_RATE = 18.0
     BASE_CURRENCY = "UGX"
+
+    # Production UI (decided 6 Jul 2026): production moves to its own app on
+    # the same database. This deployment hides the production screens; the
+    # factory deployment sets PRODUCTION_UI=1. An ENVIRONMENT switch on
+    # purpose — a database flag would flip both apps at once, since they
+    # share the database. Models and data stay untouched either way.
+    PRODUCTION_UI = os.environ.get("PRODUCTION_UI") == "1"

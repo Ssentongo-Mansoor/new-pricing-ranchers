@@ -153,7 +153,7 @@
       <a class="nav-link {{ 'active' if ep.startswith('cuts.') }}" href="{{ url_for('cuts.index') }}"><i class="bi bi-scissors"></i> Carcass cuts</a>
       <a class="nav-link {{ 'active' if ep.startswith('whatif.') }}" href="{{ url_for('whatif.index') }}"><i class="bi bi-graph-up-arrow"></i> What-if</a>
       {% endif %}
-      {% if has_perm(current_user, 'view_production') %}
+      {% if config.PRODUCTION_UI and has_perm(current_user, 'view_production') %}
       {{ navgroup('Production') }}
       <a class="nav-link {{ 'active' if ep in ['production.index','production.product_detail'] }}" href="{{ url_for('production.index') }}"><i class="bi bi-hammer"></i> To produce</a>
       <a class="nav-link {{ 'active' if ep=='production.stock' }}" href="{{ url_for('production.stock') }}"><i class="bi bi-boxes"></i> Stock vs demand</a>
@@ -253,7 +253,7 @@
       {% endif %}{# end ceo / other-roles nav #}
       {# Module groups shared across roles, gated by capability. Finance roles
          already carry these groups (accounting-first) in their own branch. #}
-      {% if has_perm(current_user, 'view_production') and not current_user.is_finance %}
+      {% if config.PRODUCTION_UI and has_perm(current_user, 'view_production') and not current_user.is_finance %}
       {{ navgroup('Production') }}
       <a class="nav-link {{ 'active' if ep in ['production.index','production.product_detail'] }}" href="{{ url_for('production.index') }}"><i class="bi bi-hammer"></i> To produce</a>
       <a class="nav-link {{ 'active' if ep=='production.orders' }}" href="{{ url_for('production.orders') }}"><i class="bi bi-list-check"></i> Order coverage</a>
