@@ -308,10 +308,17 @@ def _ceo_dashboard():
     orders = db.session.scalars(db.select(SalesOrder)).all()
     booked = [o for o in orders if o.status in CONFIRMED and o.order_date]
 
-    cutover = db.session.scalar(
+    # The uploaded invoices are the sales record for every month they cover
+    # (running record from 1 Jul 2026, topped up per upload). App orders only
+    # own months BEYOND the latest invoice, so nothing double-counts when an
+    # app order later comes back as an Odoo invoice. sales_history keeps its
+    # own cutover for the product mix (monthly pivot, catalogue products).
+    hist_cutover = db.session.scalar(
         db.select(db.func.max(SalesHistory.year * 12 + SalesHistory.month))) or 0
+    last_inv_date = db.session.scalar(db.select(db.func.max(Invoice.invoice_date)))
+    inv_cutover = (last_inv_date.year * 12 + last_inv_date.month) if last_inv_date else 0
     cur_idx = today.year * 12 + today.month
-    target = max(cutover, cur_idx)            # latest month to report on
+    target = max(inv_cutover, hist_cutover, cur_idx)  # latest month to report on
     recent_lo = target - 2                    # last 3 months for the top lists
 
     def _i2d(idx):
@@ -332,18 +339,19 @@ def _ceo_dashboard():
     dist_rev = defaultdict(float)
     prod_rev = defaultdict(float)
 
-    # History (uploaded invoices, net UGX) owns months up to the cutover.
+    # Uploaded invoices (net UGX) own every month up to the latest invoice.
     # TODO(H5): non-UGX invoices are dropped here. The Invoice model stores only
     # a currency, no rate column, so converting historical foreign invoices needs
     # a dated rate lookup per row. Left as UGX-only until an invoice rate is
     # captured on import; live foreign orders are handled by net_ugx().
+    inv_daily = defaultdict(float)            # current-month daily curve
     for i in db.session.scalars(db.select(Invoice).where(
             Invoice.currency == "UGX", Invoice.payment_status != "Reversed",
             Invoice.invoice_date.isnot(None))):
         idx = i.invoice_date.year * 12 + i.invoice_date.month
-        if idx > cutover:
-            continue
         v = float(i.untaxed or 0)
+        if i.invoice_date >= month_start:
+            inv_daily[i.invoice_date] += v
         monthly[idx] += v
         if idx == target:
             chan[_chan(i.customer)] += v
@@ -354,10 +362,10 @@ def _ceo_dashboard():
             if i.customer and (i.customer.segment or "") == "distributor":
                 dist_rev[i.customer_name or "—"] += v
 
-    # Live app orders own months after the cutover (keeps growing)
+    # Live app orders own months after the latest invoice (keeps growing)
     for o in booked:
         idx = o.order_date.year * 12 + o.order_date.month
-        if idx <= cutover:
+        if idx <= inv_cutover:
             continue
         v = _ugx(o)
         c = o.customer
@@ -379,33 +387,37 @@ def _ceo_dashboard():
                     or l.description or "—"
                 prod_rev[nm] += float(l.line_total or 0) * rate
 
-    # Top products (last 3 months) from the linked monthly history (catalogue only)
+    # Top products (last 3 months) from the linked monthly history (catalogue
+    # only). Post-history months have no product split until the line-item
+    # invoice export lands; the mix simply covers the history months.
     for s in db.session.scalars(db.select(SalesHistory).where(SalesHistory.month.isnot(None))):
         idx = s.year * 12 + s.month
-        if recent_lo <= idx <= target and idx <= cutover:
+        if recent_lo <= idx <= target and idx <= hist_cutover:
             l = pmap.get(s.product_id)
             if l:
                 prod_rev[l] += float(s.revenue or 0)
 
-    # Main chart, source-aware:
-    #  - while the current month is still inside the uploaded history (monthly,
-    #    no daily detail), show recent months from the history (real numbers);
-    #  - once we're past the history (live months), show the live daily
-    #    month-to-date cumulative curve.
-    if target > cutover:
-        mtd_days = [month_start + timedelta(days=i) for i in range((today - month_start).days + 1)]
-        dser = {d: 0.0 for d in mtd_days}
-        for o in booked:
-            if o.order_date in dser:
-                dser[o.order_date] += _ugx(o)
-        running = 0.0
-        chart_labels, chart_values = [], []
-        for d in sorted(dser):
-            running += dser[d]
-            chart_labels.append(d.strftime("%d %b"))
-            chart_values.append(round(running))
-        chart_mode = "mtd"
-    else:
+    # Main chart: daily month-to-date cumulative curve. Invoices carry daily
+    # dates, so the current month draws from them; app orders add the days
+    # beyond the latest invoice (their months are past inv_cutover).
+    mtd_days = [month_start + timedelta(days=i) for i in range((today - month_start).days + 1)]
+    dser = {d: 0.0 for d in mtd_days}
+    for d, v in inv_daily.items():
+        if d in dser:
+            dser[d] += v
+    for o in booked:
+        idx = o.order_date.year * 12 + o.order_date.month
+        if idx > inv_cutover and o.order_date in dser:
+            dser[o.order_date] += _ugx(o)
+    running = 0.0
+    chart_labels, chart_values = [], []
+    for d in sorted(dser):
+        running += dser[d]
+        chart_labels.append(d.strftime("%d %b"))
+        chart_values.append(round(running))
+    chart_mode = "mtd"
+    if not any(chart_values):
+        # No activity yet this month: fall back to the 6-month bar view.
         idxs = list(range(target - 5, target + 1))
         chart_labels = [_i2d(i).strftime("%b %y") for i in idxs]
         chart_values = [round(monthly[i]) for i in idxs]
@@ -617,8 +629,11 @@ def _rep_dashboard(orders, today):
     assigned_ids = {c.id for c in assigned}
     booked = [o for o in orders if o.status in CONFIRMED and o.order_date]
 
-    cutover = db.session.scalar(
-        db.select(db.func.max(SalesHistory.year * 12 + SalesHistory.month))) or 0
+    # Invoices own every month they cover (running record from 1 Jul 2026);
+    # app orders only own months beyond the latest invoice — same rule as the
+    # CEO dashboard, so a rep's July sales come from the uploaded invoices.
+    last_inv_date = db.session.scalar(db.select(db.func.max(Invoice.invoice_date)))
+    cutover = (last_inv_date.year * 12 + last_inv_date.month) if last_inv_date else 0
     target = max(cutover, today.year * 12 + today.month)
     recent_lo = target - 2
 
@@ -633,8 +648,6 @@ def _rep_dashboard(orders, today):
                 Invoice.customer_id.in_(assigned_ids), Invoice.currency == "UGX",
                 Invoice.payment_status != "Reversed", Invoice.invoice_date.isnot(None))):
             idx = i.invoice_date.year * 12 + i.invoice_date.month
-            if idx > cutover:
-                continue
             v = float(i.untaxed or 0)
             monthly[idx] += v
             if v > 0:

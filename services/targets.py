@@ -16,6 +16,13 @@ CONFIRMED = ("placed", "in_fulfillment", "pending", "ready_for_dispatch",
 
 
 def cutover_idx():
+    """Last month covered by uploaded invoices. Invoices are the running
+    sales record from 1 Jul 2026 (topped up per upload); live app orders own
+    months after the latest invoice. Falls back to the sales_history pivot
+    when the invoice table is empty."""
+    d = db.session.scalar(db.select(db.func.max(Invoice.invoice_date)))
+    if d is not None:
+        return d.year * 12 + d.month
     return db.session.scalar(
         db.select(db.func.max(SalesHistory.year * 12 + SalesHistory.month))) or 0
 

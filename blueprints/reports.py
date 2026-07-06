@@ -92,9 +92,10 @@ def index():
             n_at_risk += 1
 
     # --- glanceable snapshot: one continuous monthly timeline ---
-    # History (uploaded invoices, net UGX) owns months up to the last historical
-    # month; live app orders own every month after that, so the view keeps
-    # growing as orders are placed.
+    # Uploaded invoices (net UGX) own every month they cover — the invoice
+    # table is the running sales record from 1 Jul 2026, topped up per upload.
+    # Live app orders own months after the latest invoice only, so nothing
+    # double-counts when an app order later comes back as an Odoo invoice.
     from models import Invoice, SalesHistory
 
     # Net (excl-VAT) UGX so live orders match the net invoice history.
@@ -107,9 +108,11 @@ def index():
             return "Distributors"
         return (c.category.name if c.category else None) or "Other"
 
-    cutover = _sh_latest_idx()                       # last historical month index
+    hist_cutover = _sh_latest_idx()                   # last pivot month (product mix)
+    last_inv = db.session.scalar(db.select(db.func.max(Invoice.invoice_date)))
+    cutover = (last_inv.year * 12 + last_inv.month) if last_inv else 0
     cur_idx = today.year * 12 + today.month
-    target = max(cutover, cur_idx)                    # the month we report "to date"
+    target = max(cutover, hist_cutover, cur_idx)      # the month we report "to date"
     start_idx = target - 5                            # 6-month context
     hist_month, live_month = defaultdict(float), defaultdict(float)
     chan, custr, prodm = defaultdict(float), defaultdict(float), defaultdict(float)
@@ -121,8 +124,6 @@ def index():
             Invoice.currency == "UGX", Invoice.payment_status != "Reversed",
             Invoice.invoice_date.isnot(None))):
         idx = i.invoice_date.year * 12 + i.invoice_date.month
-        if idx > cutover:
-            continue
         val = float(i.untaxed or 0)
         if start_idx <= idx <= target:
             hist_month[idx] += val
@@ -148,8 +149,10 @@ def index():
                 for l in o.lines:
                     prodm[(l.description or l.article_no or "—")] += _money(l.line_total) * rate
 
-    # products this month: from the monthly history if the month is historical
-    if target <= cutover:
+    # products this month: from the monthly history if the month is historical.
+    # Invoice months past the pivot have no product split until the line-item
+    # invoice export lands.
+    if target <= hist_cutover:
         ty, tm = (target - 1) // 12, (target - 1) % 12 + 1
         for s in db.session.scalars(db.select(SalesHistory).where(
                 SalesHistory.year == ty, SalesHistory.month == tm)):
