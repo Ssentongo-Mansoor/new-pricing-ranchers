@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block heading %}{{ cl.name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <a class="small" href="{{ url_for('crm.call_lists') }}">← All call lists</a>
+    <div class="text-muted small">Assigned to {{ cl.assigned_to.full_name if cl.assigned_to else '—' }}{% if cl.due_date %} · due {{ cl.due_date.strftime('%d %b %Y') }}{% endif %} · {{ cl.done_count }}/{{ cl.total_count }} done</div>
+  </div>
+  <form method="post" action="{{ url_for('crm.call_list_archive', list_id=cl.id) }}" onsubmit="return confirm('Archive this list?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-archive"></i> Archive</button></form>
+</div>
+
+{% for it in cl.items %}
+<div class="rf-card p-3 mb-2">
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+    <div>
+      <a href="{{ url_for('customers.detail', customer_id=it.customer_id) }}#activity" class="fw-semibold">{{ it.customer.name }}</a>
+      {% if it.status=='done' %}<span class="badge badge-ok">done</span>
+      {% elif it.status=='skipped' %}<span class="badge bg-secondary">skipped</span>{% endif %}
+      <div class="small">
+        {% set primary = it.customer.contacts|selectattr('is_primary')|first %}
+        {% set k = primary or (it.customer.contacts|first) %}
+        {% if k %}{{ k.name }}{% if k.phone %} · <a href="tel:{{ k.phone }}"><i class="bi bi-telephone"></i> {{ k.phone }}</a>{% endif %}
+        {% else %}<span class="text-muted">No contact on file</span>{% endif %}
+      </div>
+    </div>
+  </div>
+  {% if it.status=='pending' %}
+  <form method="post" action="{{ url_for('crm.call_list_log', item_id=it.id) }}" class="mt-2">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="row g-2">
+      <div class="col-md-4"><input class="form-control form-control-sm" name="outcome" list="oc{{ it.id }}" placeholder="Outcome">
+        <datalist id="oc{{ it.id }}">{% for o in call_outcomes %}<option value="{{ o }}">{% endfor %}</datalist></div>
+      <div class="col-md-8"><input class="form-control form-control-sm" name="summary" placeholder="What was discussed"></div>
+      <div class="col-md-6"><input class="form-control form-control-sm" name="next_action" placeholder="Next action (optional)"></div>
+      <div class="col-md-3"><input class="form-control form-control-sm" type="date" name="next_action_date"></div>
+      <div class="col-md-3 d-flex gap-1">
+        <button class="btn btn-sm btn-primary flex-grow-1" name="status" value="done">Log call</button>
+        <button class="btn btn-sm btn-outline-secondary" name="status" value="skipped">Skip</button>
+      </div>
+    </div>
+  </form>
+  {% endif %}
+</div>
+{% else %}<p class="text-muted">This list has no customers. Add some from the customer page or create a new list with a fill rule.</p>{% endfor %}
+{% endblock %}

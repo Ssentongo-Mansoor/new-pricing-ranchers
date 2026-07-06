@@ -1,0 +1,42 @@
+{% extends "costing/_shell.html" %}
+{% block heading %}{{ 'Edit' if ingredient else 'New' }} Ingredient{% endblock %}
+{% block costing_content %}
+<div class="page-head"><h1>{{ 'Edit' if ingredient else 'New' }} Ingredient</h1></div>
+<div class="card" style="max-width:680px"><div class="card-body">
+  <form method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="mb-3">
+      <label class="form-label">Name</label>
+      <input name="name" class="form-control" required value="{{ ingredient.name if ingredient else '' }}">
+    </div>
+    <div class="row">
+      <div class="col-md-6 mb-3"><label class="form-label">Alias 1</label><input name="alias1" class="form-control" value="{{ ingredient.alias1 or '' if ingredient else '' }}"></div>
+      <div class="col-md-6 mb-3"><label class="form-label">Alias 2</label><input name="alias2" class="form-control" value="{{ ingredient.alias2 or '' if ingredient else '' }}"></div>
+    </div>
+    <div class="row">
+      <div class="col-md-4 mb-3"><label class="form-label">Unit of measure</label><input name="uom" class="form-control" value="{{ ingredient.uom if ingredient else 'kg' }}"></div>
+      <div class="col-md-8 mb-3"><label class="form-label">Base cost (UGX/kg)</label><input name="base_cost" type="number" step="0.0001" class="form-control" id="base_cost" value="{{ ingredient.base_cost if ingredient else 0 }}"></div>
+    </div>
+    <div class="row">
+      <div class="col-md-4 mb-3"><label class="form-label">Tax value</label><input name="tax_value" type="number" step="0.0001" class="form-control oh" value="{{ ingredient.tax_value if ingredient else 0 }}"></div>
+      <div class="col-md-4 mb-3"><label class="form-label">Clearance</label><input name="clearance" type="number" step="0.0001" class="form-control oh" value="{{ ingredient.clearance if ingredient else 0 }}"></div>
+      <div class="col-md-4 mb-3"><label class="form-label">Freight / transport</label><input name="freight" type="number" step="0.0001" class="form-control oh" value="{{ ingredient.freight if ingredient else 0 }}"></div>
+    </div>
+    <div class="alert alert-secondary py-2">Total landed cost: <strong id="totalLanded" class="text-rf">0</strong> UGX/kg</div>
+    <button class="btn btn-rf">Save</button>
+    <a class="btn btn-link" href="{{ url_for('ingredients.index') }}">Cancel</a>
+  </form>
+</div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+function recalc() {
+  let t = ['base_cost'].concat([...document.querySelectorAll('.oh')].map(e=>e.value? 0:0));
+  let sum = parseFloat(document.getElementById('base_cost').value||0);
+  document.querySelectorAll('.oh').forEach(e => sum += parseFloat(e.value||0));
+  document.getElementById('totalLanded').textContent = Math.round(sum).toLocaleString('en-US');
+}
+document.querySelectorAll('#base_cost, .oh').forEach(e => e.addEventListener('input', recalc));
+recalc();
+</script>
+{% endblock %}

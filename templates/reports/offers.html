@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "reports/_macros.html" import daterange %}
+{% block heading %}Quote conversion{% endblock %}
+{% block content %}
+{% include "reports/_nav.html" %}
+{{ daterange('reports.offers_report') }}
+
+<p class="small text-muted">{{ n }} quote(s) created in {{ frm }} → {{ to }}.</p>
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="rf-stat"><div class="num">{{ buckets.get('converted',0) }}</div><div class="lbl">Converted to order</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-stat"><div class="num">{{ buckets.get('not_ordered',0) }}</div><div class="lbl">Not ordered</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-stat"><div class="num">{{ (buckets.get('draft',0)+buckets.get('issued',0)) }}</div><div class="lbl">Still open</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-stat"><div class="num">{{ '%.0f'|format(conv)~'%' if conv is not none else '—' }}</div><div class="lbl">Win rate</div></div></div>
+</div>
+
+<div class="rf-card p-3" style="max-width:560px">
+  <h3 class="h6">Value by outcome</h3>
+  <table class="table table-sm mb-0">
+    <thead><tr><th>Outcome</th><th>Currency</th><th class="text-end">Value</th></tr></thead>
+    <tbody>
+    {% for status, curmap in val.items() %}
+      {% for cur, amount in curmap.items() %}
+      <tr><td class="text-capitalize">{{ status.replace('_',' ') }}</td><td>{{ cur }}</td><td class="text-end money">{{ amount|money(cur) }}</td></tr>
+      {% endfor %}
+    {% else %}<tr><td colspan="3" class="text-muted">No quotes in this period.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

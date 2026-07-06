@@ -1,0 +1,15 @@
+{% extends "portal/base.html" %}
+{% block content %}
+<h1 class="h5 rf-head mb-3">Start a new order</h1>
+<div class="rf-card p-4" style="max-width:560px">
+  <form method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="mb-3"><label class="form-label">Order from pricelist</label>
+      <select class="form-select" name="source_id" required>
+        {% for p in lists %}<option value="{{ p.id }}">{{ p.name }} ({{ p.currency }})</option>{% endfor %}
+      </select></div>
+    <button class="btn btn-primary">Start order</button>
+    <a class="btn btn-link" href="{{ url_for('portal.home') }}">Cancel</a>
+  </form>
+</div>
+{% endblock %}

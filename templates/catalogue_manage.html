@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block heading %}Admin{% endblock %}
+{% block content %}
+{% include "admin/_nav.html" %}
+<div class="rf-card p-4" style="max-width:640px">
+  <h2 class="h6 mb-1">Product catalogue</h2>
+  <p class="text-muted small mb-3">
+    Upload the catalogue as a PDF. Everyone logged in (staff and customers) sees the current
+    version. Upload again any time to replace it.
+  </p>
+
+  {% if has_file %}
+  <div class="alert alert-light border small mb-3">
+    Current: <strong>{{ label or 'Catalogue' }}</strong>{% if updated %} · updated {{ updated }}{% endif %}.
+    <a href="{{ url_for('catalogue.file') }}" target="_blank">Open</a>
+  </div>
+  {% else %}
+  <div class="alert alert-warning small mb-3">No catalogue uploaded yet.</div>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" class="mb-3">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="mb-2">
+      <label class="form-label small fw-semibold">Title (shown to users)</label>
+      <input class="form-control" type="text" name="label" value="{{ label }}"
+             placeholder="e.g. Ranchers Finest Catalogue — June 2026">
+    </div>
+    <div class="mb-3">
+      <input class="form-control" type="file" name="file" accept="application/pdf,.pdf" required>
+    </div>
+    <button class="btn btn-primary">Upload catalogue</button>
+  </form>
+
+  {% if has_file %}
+  <form method="post" onsubmit="return confirm('Remove the catalogue for everyone?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="remove" value="1">
+    <button class="btn btn-outline-danger btn-sm">Remove catalogue</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

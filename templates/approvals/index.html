@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block heading %}Approvals{% endblock %}
+{% macro kindbadge(k) %}
+  {% if k=='price' %}<span class="badge" style="background:#F47A21">Price change</span>
+  {% elif k=='product' %}<span class="badge" style="background:#6E7149">New product</span>
+  {% elif k=='pricelist' %}<span class="badge bg-dark">New pricelist</span>
+  {% elif k=='promo' %}<span class="badge" style="background:#B5341F">Promotion</span>
+  {% else %}<span class="badge bg-secondary">{{ k }}</span>{% endif %}
+{% endmacro %}
+{% block content %}
+<h1 class="h5 mb-3">{{ 'Pricing approvals' if is_approver else 'My approval requests' }}</h1>
+
+<div class="rf-card p-3 mb-4">
+  <h2 class="h6 mb-3">Pending {% if pending %}<span class="badge bg-danger">{{ pending|length }}</span>{% endif %}</h2>
+  {% for r in pending %}
+  <div class="border rounded p-3 mb-2">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+      <div>
+        {{ kindbadge(r.kind) }}
+        <span class="fw-semibold ms-1">{{ r.summary }}</span>
+        <div class="small text-muted">Requested by {{ r.requested_by.full_name if r.requested_by else '—' }} · {{ r.requested_at.strftime('%d %b %Y %H:%M') }}</div>
+      </div>
+      {% if is_approver %}
+      <form method="post" action="{{ url_for('approvals.decide', req_id=r.id, decision='approve') }}" class="d-flex gap-2 align-items-center">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input class="form-control form-control-sm" name="note" placeholder="Note (optional)" style="width:180px">
+        <button class="btn btn-sm btn-success">Approve</button>
+        <button class="btn btn-sm btn-outline-danger" formaction="{{ url_for('approvals.decide', req_id=r.id, decision='decline') }}"
+                onclick="return confirm('Decline this request?')">Decline</button>
+      </form>
+      {% endif %}
+    </div>
+    {% if details.get(r.id) %}
+    <div class="table-responsive mt-2">
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Product</th><th>Tier</th><th class="text-end">Current</th><th class="text-end">Proposed</th></tr></thead>
+        <tbody>
+        {% for d in details[r.id] %}
+          <tr><td class="small">{{ d.product }}</td><td class="small">{{ d.tier }}</td>
+            <td class="text-end small text-muted">{{ d.old }}</td>
+            <td class="text-end small fw-semibold" style="color:#F47A21">{{ d.new }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% elif r.kind=='pricelist' and r.pricelist %}
+      <div class="small mt-1"><a href="{{ url_for('pricelists.detail', list_id=r.pricelist_id) }}">View the pricelist</a></div>
+    {% elif r.kind=='product' and r.product %}
+      <div class="small mt-1"><a href="{{ url_for('products.detail', product_id=r.product_id) }}">View the product</a></div>
+    {% elif r.kind=='promo' and r.promo %}
+      <div class="small mt-1">Promo price <strong>{{ '{:,.0f}'.format(r.promo.promo_amount) }}</strong>{% if r.promo.end_date %} · until {{ r.promo.end_date.strftime('%d %b %Y') }}{% endif %}{% if r.promo.qty_cap is not none %} · first {{ '%g'|format(r.promo.qty_cap) }}{% endif %} · <a href="{{ url_for('price_promos.index') }}">Promotions</a></div>
+    {% endif %}
+  </div>
+  {% else %}<p class="text-muted small mb-0">Nothing pending.</p>{% endfor %}
+</div>
+
+<div class="rf-card p-3">
+  <h2 class="h6 mb-3">Recently decided</h2>
+  <table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Type</th><th>Summary</th><th>Decision</th><th>By</th><th>When</th><th>Note</th></tr></thead>
+    <tbody>
+    {% for r in decided %}
+      <tr>
+        <td>{{ kindbadge(r.kind) }}</td>
+        <td class="small">{{ r.summary }}</td>
+        <td>{% if r.status=='approved' %}<span class="badge bg-success">approved</span>{% else %}<span class="badge bg-secondary">declined</span>{% endif %}</td>
+        <td class="small">{{ r.decided_by.full_name if r.decided_by else '—' }}</td>
+        <td class="small">{{ r.decided_at.strftime('%d %b %Y') if r.decided_at else '—' }}</td>
+        <td class="small text-muted">{{ r.decision_note or '' }}</td>
+      </tr>
+    {% else %}<tr><td colspan="6" class="text-muted small text-center py-3">Nothing yet.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block heading %}Stock take{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <a class="small" href="{{ url_for('stock.counts') }}">← All stock takes</a>
+    <h1 class="h5 rf-head mb-0">{{ count.kind_label }} stock take #{{ count.id }}
+      {% if count.status=='posted' %}<span class="badge badge-ok">posted</span>{% else %}<span class="badge bg-secondary">open</span>{% endif %}</h1>
+    <div class="small text-muted">{{ count.created_at.strftime('%d %b %Y %H:%M') }} · {{ count.created_by.full_name if count.created_by else '—' }}{% if count.note %} · {{ count.note }}{% endif %}</div>
+  </div>
+  {% if can_audit and count.status=='open' and count.lines %}
+  <form method="post" action="{{ url_for('stock.count_post', count_id=count.id) }}" onsubmit="return confirm('Post this stock take? System stock will be corrected to your counts.')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn btn-primary"><i class="bi bi-check2-circle"></i> Post &amp; correct stock</button></form>
+  {% endif %}
+</div>
+
+{% if can_audit and count.status=='open' %}
+<div class="rf-card p-3 mb-3" style="max-width:640px">
+  <label class="form-label">Add a count</label>
+  <div class="input-group mb-2">
+    <span class="input-group-text"><i class="bi bi-search"></i></span>
+    <input type="text" class="form-control" id="cSearch" placeholder="Type article no or product name…" autocomplete="off">
+  </div>
+  <div id="cResults" class="list-group small mb-2" style="max-height:200px; overflow:auto"></div>
+  <form method="post" action="{{ url_for('stock.count_line', count_id=count.id) }}" id="cForm" class="d-none">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="product_id" id="cProd">
+    <div class="d-flex align-items-center gap-2">
+      <div class="flex-grow-1"><strong id="cLabel">—</strong> <span class="small text-muted" id="cSys"></span></div>
+      <input class="form-control form-control-sm" name="counted_qty" id="cQty" type="number" step="any" min="0" placeholder="physical qty" style="width:130px" required>
+      <button class="btn btn-sm btn-primary">Add</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+<div class="rf-card p-0">
+  <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Art</th><th>Description</th><th class="text-end">System</th><th class="text-end">Counted</th><th class="text-end">Discrepancy</th>{% if can_audit and count.status=='open' %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+    {% for l in count.lines %}
+      <tr>
+        <td class="small fw-semibold">{{ l.product.article_no }}</td>
+        <td class="small">{{ l.product.description }}</td>
+        <td class="text-end">{{ '%g'|format(l.system_qty) if l.system_qty is not none else '—' }}</td>
+        <td class="text-end">{{ '%g'|format(l.counted_qty) if l.counted_qty is not none else '—' }}</td>
+        <td class="text-end fw-semibold {{ 'text-danger' if (l.discrepancy or 0) < 0 else ('text-success' if (l.discrepancy or 0) > 0 else 'text-muted') }}">
+          {{ '%+g'|format(l.discrepancy) if l.discrepancy not in (none, 0) else '0' }}</td>
+        {% if can_audit and count.status=='open' %}
+        <td class="text-end"><form method="post" action="{{ url_for('stock.count_line_remove', count_id=count.id, line_id=l.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-link text-muted p-0"><i class="bi bi-trash"></i></button></form></td>
+        {% endif %}
+      </tr>
+    {% else %}<tr><td colspan="6" class="text-center text-muted py-3">No counts entered yet.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% if count.status=='posted' %}<p class="small text-muted mt-2">Posted {{ count.posted_at.strftime('%d %b %Y %H:%M') if count.posted_at }} — stock corrected to these counts.</p>{% endif %}
+{% endblock %}
+{% block scripts %}
+{% if can_audit and count.status=='open' %}
+<script>
+var box=document.getElementById('cSearch'), res=document.getElementById('cResults'), timer=null;
+box.addEventListener('input', function(){ clearTimeout(timer); timer=setTimeout(run,200); });
+box.addEventListener('keydown', function(e){ if(e.key==='Enter') e.preventDefault(); });
+function run(){
+  fetch("{{ url_for('stock.search') }}?q="+encodeURIComponent(box.value)).then(r=>r.json()).then(function(d){
+    res.innerHTML='';
+    d.results.forEach(function(it){
+      var a=document.createElement('a'); a.href='#'; a.className='list-group-item list-group-item-action';
+      var strong=document.createElement('strong'); strong.textContent=it.article_no;
+      a.appendChild(strong); a.appendChild(document.createTextNode(' '+(it.description||'')+' '));
+      var sysSpan=document.createElement('span'); sysSpan.className='text-muted';
+      sysSpan.textContent='('+(+it.on_hand.toFixed(2))+' '+(it.uom||'')+' in system)';
+      a.appendChild(sysSpan);
+      a.onclick=function(e){ e.preventDefault(); pick(it); };
+      res.appendChild(a);
+    });
+    if(!d.results.length) res.innerHTML='<div class="text-muted p-2">No matches.</div>';
+  });
+}
+function pick(it){
+  document.getElementById('cForm').classList.remove('d-none');
+  document.getElementById('cProd').value=it.id;
+  document.getElementById('cLabel').textContent=it.article_no+' · '+it.description;
+  document.getElementById('cSys').textContent='system: '+(+it.on_hand.toFixed(2))+' '+(it.uom||'');
+  res.innerHTML=''; box.value='';
+  document.getElementById('cQty').focus();
+}
+</script>
+{% endif %}
+{% endblock %}

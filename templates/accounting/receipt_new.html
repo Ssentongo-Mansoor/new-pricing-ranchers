@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block heading %}Record customer receipt{% endblock %}
+{% block content %}
+<form method="get" action="{{ url_for('accounting.receipt_new') }}" class="rf-card p-3 mb-3 d-flex gap-2 align-items-end">
+  <div><label class="form-label small">Customer (with open invoices)</label>
+    <select class="form-select" name="customer_id" onchange="this.form.submit()">
+      <option value="">— choose —</option>
+      {% for c in customers %}<option value="{{ c.id }}" {{ 'selected' if customer and customer.id==c.id }}>{{ c.name }}</option>{% endfor %}
+    </select></div>
+</form>
+
+{% if customer %}
+<form method="post" action="{{ url_for('accounting.receipt_create') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<input type="hidden" name="customer_id" value="{{ customer.id }}">
+
+<div class="table-responsive rf-card mb-3">
+<table class="table table-sm align-middle mb-0" id="alloctable">
+  <thead><tr><th>Invoice</th><th>Date</th><th>Ccy</th>
+    <th class="text-end">Gross</th><th class="text-end">Open</th>
+    <th class="text-end" style="width:180px">Settle now</th></tr></thead>
+  <tbody>
+  {% for i in open_invoices %}
+    <tr>
+      <td class="fw-semibold">{{ i.invoice_no }}<input type="hidden" name="inv_id" value="{{ i.id }}"></td>
+      <td class="small">{{ i.invoice_date.strftime('%d %b %Y') }}</td>
+      <td class="small">{{ i.currency }}</td>
+      <td class="text-end">{{ '{:,}'.format(i.gross_minor) }}</td>
+      <td class="text-end fw-semibold">{{ '{:,}'.format(i.open_minor) }}</td>
+      <td><input class="form-control form-control-sm text-end alloc" name="alloc"
+                 data-open="{{ i.open_minor }}" inputmode="decimal" placeholder="0"></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6" class="text-muted text-center py-3">No open invoices for this customer.</td></tr>
+  {% endfor %}
+  </tbody>
+  <tfoot><tr class="fw-semibold"><td colspan="5" class="text-end">Allocated</td>
+    <td class="text-end" id="allocated">0</td></tr></tfoot>
+</table>
+</div>
+
+<div class="rf-card p-3 mb-3">
+  <div class="row g-2">
+    <div class="col-md-2"><label class="form-label small">Date</label>
+      <input class="form-control" type="date" name="receipt_date" value="{{ today }}"></div>
+    <div class="col-md-2"><label class="form-label small">Method</label>
+      <select class="form-select" name="method">
+        {% for k, lbl in methods.items() %}<option value="{{ k }}">{{ lbl }}</option>{% endfor %}
+      </select></div>
+    <div class="col-md-2"><label class="form-label small">Amount received</label>
+      <input class="form-control text-end" name="amount" id="amt" inputmode="decimal" required></div>
+    <div class="col-md-2"><label class="form-label small">WHT withheld (6%)</label>
+      <input class="form-control text-end" name="wht" id="wht" inputmode="decimal" placeholder="0"></div>
+    <div class="col-md-2"><label class="form-label small">FX rate (USD only)</label>
+      <input class="form-control text-end" name="fx_rate" inputmode="decimal" placeholder="UGX per USD"></div>
+    <div class="col-md-2"><label class="form-label small">Note</label>
+      <input class="form-control" name="notes" maxlength="255"></div>
+  </div>
+  <div class="small mt-2" id="balmsg"></div>
+</div>
+
+<button class="btn btn-primary" id="postbtn"><i class="bi bi-check2"></i> Post receipt</button>
+<a class="btn btn-link" href="{{ url_for('accounting.receipts') }}">Cancel</a>
+<p class="small text-muted mt-2">Money received plus WHT must equal the total
+allocated — a receipt settles invoices, nothing floats. A customer who is a
+designated withholding agent pays 94% cash and the 6% becomes a tax credit.</p>
+
+<script>
+(function(){
+  function num(v){ v = parseFloat((v||'').toString().replace(/,/g,'')); return isNaN(v)?0:v; }
+  function recalc(){
+    var total = 0;
+    document.querySelectorAll('.alloc').forEach(function(i){ total += num(i.value); });
+    document.getElementById('allocated').textContent = total.toLocaleString();
+    var settled = num(document.getElementById('amt').value) + num(document.getElementById('wht').value);
+    var msg = document.getElementById('balmsg');
+    if (total === 0 && settled === 0) { msg.textContent=''; return; }
+    if (Math.abs(total - settled) < 0.5) {
+      msg.textContent = 'Allocations match money + WHT ✓'; msg.className = 'small mt-2 text-success';
+    } else {
+      msg.textContent = 'Allocated ' + total.toLocaleString() + ' vs money + WHT ' + settled.toLocaleString();
+      msg.className = 'small mt-2 text-danger';
+    }
+  }
+  document.addEventListener('input', function(e){
+    if (e.target.classList.contains('alloc') || e.target.id==='amt' || e.target.id==='wht') recalc();
+  });
+})();
+</script>
+</form>
+{% endif %}
+{% endblock %}

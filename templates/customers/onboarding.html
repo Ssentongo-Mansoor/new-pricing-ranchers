@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block heading %}Onboarding queue{% endblock %}
+{% block content %}
+<p class="text-muted">New customers registered by reps, awaiting a pricelist and credit-terms approval.</p>
+<div class="rf-card p-0">
+  <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+    <thead><tr><th>Customer</th><th>Type</th><th>Registered by</th><th>Proposed terms</th><th>When</th><th></th></tr></thead>
+    <tbody>
+    {% for c in rows %}
+      <tr>
+        <td><a href="{{ url_for('customers.detail', customer_id=c.id) }}" class="fw-semibold">{{ c.name }}</a>
+          <div class="small text-muted">{{ c.category.name if c.category else '—' }}{% if c.contact_name %} · {{ c.contact_name }}{% endif %}{% if c.phone %} · {{ c.phone }}{% endif %}</div></td>
+        <td>{% if c.segment=='distributor' %}<span class="badge" style="background:var(--rf-orange)">Distributor</span>{% else %}<span class="badge bg-secondary">Customer</span>{% endif %}</td>
+        <td class="small">{{ c.created_by.full_name if c.created_by else '—' }}</td>
+        <td class="small">{{ c.proposed_payment_terms or '—' }}</td>
+        <td class="small">{{ c.created_at.strftime('%d %b %Y') if c.created_at else '—' }}</td>
+        <td class="text-end"><a class="btn btn-sm btn-primary" href="{{ url_for('customers.edit', customer_id=c.id) }}"><i class="bi bi-link-45deg"></i> Allocate &amp; approve</a></td>
+      </tr>
+    {% else %}<tr><td colspan="6" class="text-center text-muted py-4">Nothing awaiting approval. 🎉</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}

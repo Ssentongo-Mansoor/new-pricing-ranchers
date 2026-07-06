@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block heading %}My account{% endblock %}
+{% block content %}
+<div class="row">
+  <div class="col-lg-5">
+    <div class="rf-card p-4">
+      <h2 class="h6 mb-3">Change password</h2>
+      <form method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-3"><label class="form-label">Current password</label>
+          <input type="password" name="current_password" class="form-control" required></div>
+        <div class="mb-3"><label class="form-label">New password (min 8)</label>
+          <input type="password" name="new_password" class="form-control" required></div>
+        <div class="mb-3"><label class="form-label">Confirm new password</label>
+          <input type="password" name="confirm_password" class="form-control" required></div>
+        <button class="btn btn-primary">Update password</button>
+      </form>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="rf-card p-4">
+      <h2 class="h6 mb-3">Profile</h2>
+      <dl class="row mb-0">
+        <dt class="col-5">Name</dt><dd class="col-7">{{ current_user.full_name }}</dd>
+        <dt class="col-5">Username</dt><dd class="col-7">{{ current_user.username }}</dd>
+        <dt class="col-5">Role</dt><dd class="col-7 text-capitalize">{{ current_user.role }}</dd>
+        <dt class="col-5">Edit rights</dt><dd class="col-7">{{ 'Yes' if current_user.may_edit_prices else 'No (read-only)' }}</dd>
+      </dl>
+    </div>
+  </div>
+</div>
+{% endblock %}

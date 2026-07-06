@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block heading %}Sales history{% endblock %}
+{% macro ugx(v) %}UGX {{ '{:,.0f}'.format(v or 0) }}{% endmacro %}
+{% block content %}
+{% include "reports/_nav.html" %}
+
+{% if not has_data %}
+<div class="rf-card p-4"><p class="text-muted mb-0">No historical invoices loaded yet.</p></div>
+{% else %}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <p class="small text-muted mb-0">Invoiced sales, untaxed UGX, excluding reversed. Dated from the accounting export; product mix from the yearly pivot.</p>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('reports.sales_history', export='csv') }}"><i class="bi bi-download"></i> CSV (by customer)</a>
+</div>
+
+<div class="row g-3 mb-3">
+  {% for y in years %}
+  <div class="col"><div class="rf-card p-3 text-center h-100">
+    <div class="text-muted small text-uppercase">{{ y }}</div>
+    <div class="h4 mb-0" style="color:#F47A21">{{ ugx(year_tot[y].rev) }}</div>
+    <div class="small text-muted">{{ '{:,}'.format(year_tot[y].n) }} invoices</div></div></div>
+  {% endfor %}
+  <div class="col"><div class="rf-card p-3 text-center h-100">
+    <div class="text-muted small text-uppercase">Outstanding</div>
+    <div class="h4 mb-0" style="color:#ED1C24">{{ ugx(outstanding_total) }}</div>
+    <div class="small text-muted">{{ '{:,}'.format(owe_count) }} unpaid/partial</div></div></div>
+  <div class="col"><div class="rf-card p-3 text-center h-100">
+    <div class="text-muted small text-uppercase">Matched</div>
+    <div class="h4 mb-0" style="color:#6E7149">{{ '%.0f'|format(coverage) }}%</div>
+    <div class="small text-muted">revenue linked to customers</div></div></div>
+</div>
+
+<div class="rf-card p-3 mb-3">
+  <h2 class="h6"><i class="bi bi-graph-up-arrow text-rf-orange"></i> Monthly revenue</h2>
+  <canvas id="monthChart" height="90"></canvas>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-7"><div class="rf-card p-3 h-100">
+    <h2 class="h6"><i class="bi bi-star text-rf-orange"></i> Top customers</h2>
+    <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Customer</th>{% for y in years %}<th class="text-end">{{ y }}</th>{% endfor %}<th class="text-end">Total</th></tr></thead>
+      <tbody>
+      {% for name, total, by in top_customers %}
+        <tr><td class="small fw-semibold">{{ loop.index }}. {{ name }}</td>
+          {% for y in years %}<td class="text-end small money">{{ '{:,.0f}'.format(by.get(y,0)) }}</td>{% endfor %}
+          <td class="text-end money fw-semibold">{{ '{:,.0f}'.format(total) }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div></div></div>
+  <div class="col-lg-5"><div class="rf-card p-3 h-100">
+    <h2 class="h6"><i class="bi bi-people-fill text-rf-orange"></i> Salesperson performance</h2>
+    <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Salesperson</th><th class="text-end">Revenue</th><th class="text-end">Invoices</th></tr></thead>
+      <tbody>
+      {% for name, rev, cnt in top_sales %}
+        <tr><td class="small fw-semibold">{{ loop.index }}. {{ name }}</td>
+          <td class="text-end money">{{ '{:,.0f}'.format(rev) }}</td>
+          <td class="text-end small">{{ '{:,}'.format(cnt) }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div></div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6"><div class="rf-card p-3 h-100">
+    <h2 class="h6 text-danger"><i class="bi bi-cash-stack"></i> Receivables — who owes <span class="text-muted small fw-normal">(unpaid + partial, taxed total)</span></h2>
+    <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Customer</th><th class="text-end">Outstanding</th></tr></thead>
+      <tbody>
+      {% for name, amt in top_owing %}
+        <tr><td class="small">{{ loop.index }}. {{ name }}</td><td class="text-end money text-danger">{{ '{:,.0f}'.format(amt) }}</td></tr>
+      {% else %}<tr><td colspan="2" class="text-muted small">Nothing outstanding.</td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+    <div class="small text-muted mt-1">Partially-paid invoices show their full total here.</div></div></div>
+  <div class="col-lg-6"><div class="rf-card p-3 h-100">
+    <h2 class="h6"><i class="bi bi-box-seam text-rf-orange"></i> Top products <span class="text-muted small fw-normal">(from product pivot)</span></h2>
+    <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Product</th>{% for y in prod_years %}<th class="text-end">{{ y }}</th>{% endfor %}<th class="text-end">Total</th></tr></thead>
+      <tbody>
+      {% for name, total, by in top_products %}
+        <tr><td class="small fw-semibold">{{ loop.index }}. {{ name }}</td>
+          {% for y in prod_years %}<td class="text-end small money">{{ '{:,.0f}'.format(by.get(y,0)) }}</td>{% endfor %}
+          <td class="text-end money fw-semibold">{{ '{:,.0f}'.format(total) }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div></div></div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if has_data %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script>
+const ugxTick = v => 'UGX ' + Number(v).toLocaleString();
+(function(){
+  const ctx=document.getElementById('monthChart'); if(!ctx) return;
+  new Chart(ctx,{type:'line',data:{labels:{{ month_labels|tojson }},
+    datasets:[{data:{{ month_values|tojson }},borderColor:'#F47A21',
+      backgroundColor:'rgba(244,122,33,0.12)',fill:true,tension:0.3,pointRadius:0,borderWidth:2}]},
+    options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>ugxTick(c.parsed.y)}}},
+      scales:{x:{ticks:{maxTicksLimit:12,autoSkip:true}},y:{ticks:{callback:ugxTick}}}}});
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block heading %}New product{% endblock %}
+{% block content %}
+<div class="rf-card p-4" style="max-width:680px">
+  <p class="text-muted">Create a product and post it to the pricelists where it should appear, each with its own price. You can also add it to more lists later from the pricelist pages.</p>
+  <form method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="row">
+      <div class="col-md-5 mb-3"><label class="form-label">Article number *</label>
+        <div class="input-group">
+          <input class="form-control" id="artNo" name="article_no" value="{{ form.get('article_no','') }}" required placeholder="pick a category to suggest">
+          <button class="btn btn-outline-secondary" type="button" id="suggestBtn" title="Suggest from category"><i class="bi bi-magic"></i></button>
+        </div>
+        <div class="form-text" id="artHint">Choose a category and a code is suggested. You can edit it.</div></div>
+      <div class="col-md-7 mb-3"><label class="form-label">Description *</label>
+        <input class="form-control" name="description" value="{{ form.get('description','') }}" required></div>
+    </div>
+    <div class="row">
+      <div class="col-md-5 mb-3"><label class="form-label">Barcode</label>
+        <input class="form-control" name="barcode" value="{{ form.get('barcode','') }}"></div>
+      <div class="col-md-4 mb-3"><label class="form-label">Pack size</label>
+        <input class="form-control" name="pack_size" value="{{ form.get('pack_size','') }}" placeholder="e.g. 1kg, 500G"></div>
+      <div class="col-md-3 mb-3"><label class="form-label">Unit</label>
+        <input class="form-control" name="unit_of_measure" value="{{ form.get('unit_of_measure','') }}" placeholder="kg / pack"></div>
+    </div>
+    <div class="mb-3"><label class="form-label">Category</label>
+      <select class="form-select" id="catSel" name="category_id">
+        <option value="">— none —</option>
+        {% for c in cats %}<option value="{{ c.id }}" {{ 'selected' if form.get('category_id')==c.id|string }}>{{ c.full_name }}</option>{% endfor %}
+      </select></div>
+    <div class="form-check mb-3">
+      <input class="form-check-input" type="checkbox" name="vat_applicable" value="1" id="vat">
+      <label class="form-check-label" for="vat">Carries VAT (processed product). Leave unticked for VAT-exempt items.</label>
+    </div>
+    <div class="mb-3"><label class="form-label">Unit cost (UGX, per unit above)</label>
+      <input class="form-control" name="unit_cost" inputmode="decimal" value="{{ form.get('unit_cost','') }}" style="max-width:240px">
+      <div class="form-text">When set, prices below this cost are blocked everywhere. Leave blank for no cost floor.</div>
+    </div>
+
+    <div class="rf-card-soft border rounded p-3 mb-3">
+      <h2 class="h6 mb-1"><i class="bi bi-card-list text-rf-orange"></i> Post to pricelists</h2>
+      <p class="small text-muted mb-2">Tick each pricelist the product should appear on and enter its price (excl VAT). VAT-inclusive is worked out automatically. Leave a price blank to skip that list.</p>
+      {% macro plrow(pl, dist=False) %}
+        <div class="row g-2 align-items-center mb-1">
+          <div class="col-md-7">
+            <div class="form-check">
+              <input class="form-check-input pl-cb" type="checkbox" name="pricelist" value="{{ pl.id }}" id="pl{{ pl.id }}" data-price="price_{{ pl.id }}">
+              <label class="form-check-label small" for="pl{{ pl.id }}">{{ pl.name }} <span class="text-muted">({{ pl.currency }})</span></label>
+            </div>
+          </div>
+          <div class="col-md-5">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">{{ 'Distr. price' if dist else 'Price excl' }}</span>
+              <input class="form-control" name="price_{{ pl.id }}" inputmode="numeric" placeholder="{{ 'discounted price' if dist else '0' }}">
+            </div>
+          </div>
+        </div>
+      {% endmacro %}
+      {% if standard_lists %}
+      <div class="text-uppercase small fw-semibold text-muted mt-1 mb-1">Standard lists</div>
+      {% for pl in standard_lists %}{{ plrow(pl) }}{% endfor %}
+      {% endif %}
+      {% if distributor_lists %}
+      <div class="text-uppercase small fw-semibold text-muted mt-2 mb-1">Distributor lists <span class="fw-normal text-lowercase">— distributors usually get a discounted price</span></div>
+      {% for pl in distributor_lists %}{{ plrow(pl, dist=True) }}{% endfor %}
+      {% endif %}
+    </div>
+
+    <button class="btn btn-primary">Create product</button>
+    <a class="btn btn-link" href="{{ url_for('products.index') }}">Cancel</a>
+  </form>
+</div>
+<script>
+(function(){
+  var art=document.getElementById('artNo'), cat=document.getElementById('catSel'),
+      btn=document.getElementById('suggestBtn'), hint=document.getElementById('artHint');
+  var lastSuggested="";
+  function suggest(force){
+    var cid=cat.value;
+    if(!cid){ return; }
+    // don't overwrite a code the user typed themselves
+    if(!force && art.value && art.value!==lastSuggested) return;
+    fetch("{{ url_for('products.suggest_code') }}?category_id="+cid)
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(d.code){ art.value=d.code; lastSuggested=d.code;
+          hint.textContent="Suggested "+d.code+" — edit if needed."; }
+      });
+  }
+  cat.addEventListener('change', function(){ suggest(false); });
+  btn.addEventListener('click', function(){ suggest(true); });
+  // Typing a price ticks its pricelist checkbox automatically.
+  document.querySelectorAll('.pl-cb').forEach(function(cb){
+    var inp = document.getElementsByName(cb.getAttribute('data-price'))[0];
+    if(inp){ inp.addEventListener('input', function(){ if(inp.value.trim()) cb.checked = true; }); }
+  });
+})();
+</script>
+{% endblock %}

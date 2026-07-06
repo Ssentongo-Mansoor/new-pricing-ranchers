@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block heading %}Products{% endblock %}
+{% block content %}
+{% if current_user.can_manage_all %}
+<div class="d-flex justify-content-end mb-2">
+  <a class="btn btn-primary" href="{{ url_for('products.new') }}"><i class="bi bi-plus-lg"></i> New product</a>
+</div>
+{% endif %}
+<form class="row g-2 mb-3" method="get">
+  <div class="col-md-4"><input class="form-control" name="q" value="{{ q }}" placeholder="Search article no, description or barcode"></div>
+  <div class="col-md-3"><select class="form-select" name="category">
+    <option value="">All categories</option>
+    {% for c in categories %}<option value="{{ c }}" {{ 'selected' if c==cat }}>{{ c }}</option>{% endfor %}
+  </select></div>
+  <div class="col-md-2"><select class="form-select" name="vat">
+    <option value="" {{ 'selected' if not vat }}>All VAT</option>
+    <option value="vat" {{ 'selected' if vat=='vat' }}>VAT only</option>
+    <option value="exempt" {{ 'selected' if vat=='exempt' }}>Exempt only</option>
+  </select></div>
+  <div class="col-md-1 form-check d-flex align-items-center ms-2">
+    <input class="form-check-input me-2" type="checkbox" name="inactive" value="1" id="i" {{ 'checked' if show_inactive }}>
+    <label class="form-check-label small" for="i">Inactive</label></div>
+  <div class="col-md-1"><button class="btn btn-primary w-100">Filter</button></div>
+</form>
+<div class="table-responsive rf-card">
+<table class="table table-sm table-hover align-middle mb-0">
+  <thead><tr><th>Art No</th><th>Description</th><th>Barcode</th><th>Pack</th><th>Category</th><th class="text-end">Stock</th><th>VAT</th><th>Status</th>{% if current_user.can_manage_all %}<th></th>{% endif %}</tr></thead>
+  <tbody>
+  {% for p in products %}
+    <tr>
+      <td class="fw-semibold"><a href="{{ url_for('products.detail', product_id=p.id) }}">{{ p.article_no }}</a></td>
+      <td>{{ p.description }}</td>
+      <td class="small">{{ p.barcode or '' }}</td>
+      <td class="small">{{ p.pack_size or '' }}</td>
+      <td class="small">{{ p.category.full_name if p.category else '—' }}</td>
+      <td class="text-end">
+        {% if p.is_out_of_stock %}<span class="badge badge-danger">{{ '%g'|format(p.stock_on_hand or 0) }}</span>
+        {% elif p.is_low_stock %}<span class="badge badge-warn">{{ '%g'|format(p.stock_on_hand or 0) }}</span>
+        {% else %}<span class="badge badge-ok">{{ '%g'|format(p.stock_on_hand or 0) }}</span>{% endif %}
+        <span class="small text-muted">{{ p.unit_of_measure or '' }}</span>
+      </td>
+      <td>{% if p.vat_applicable %}<span class="badge" style="background:#6E7149">VAT</span>{% else %}<span class="badge bg-secondary">exempt</span>{% endif %}</td>
+      <td>{% if p.is_active %}<span class="badge badge-ok">active</span>{% else %}<span class="badge bg-secondary">inactive</span>{% endif %}</td>
+      {% if current_user.can_manage_all %}
+      <td class="text-end">
+        <a class="btn btn-sm btn-outline-secondary py-0 px-1" href="{{ url_for('products.edit', product_id=p.id) }}"><i class="bi bi-pencil"></i></a>
+        <form method="post" action="{{ url_for('products.toggle', product_id=p.id) }}" class="d-inline">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-sm btn-outline-secondary py-0 px-1">{{ 'Deactivate' if p.is_active else 'Activate' }}</button></form>
+      </td>{% endif %}
+    </tr>
+  {% else %}<tr><td colspan="9" class="text-center text-muted py-4">No products match.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="small text-muted mt-2">{{ products|length }} product(s) shown.</p>
+{% endblock %}

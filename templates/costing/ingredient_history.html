@@ -1,0 +1,31 @@
+{% extends "costing/_shell.html" %}
+{% block heading %}Price History{% endblock %}
+{% block costing_content %}
+<div class="page-head">
+  <h1>Price History — {{ ingredient.name }}</h1>
+  <div class="spacer"></div>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('ingredients.index') }}"><i class="bi bi-arrow-left"></i> Back</a>
+</div>
+<div class="card" style="max-width:760px"><div class="card-body">
+  <p>Current total landed cost: <strong class="text-rf">{{ ingredient.total_cost|money }}</strong> UGX/kg</p>
+  {% if ingredient.history %}
+  <table class="table table-sm">
+    <thead><tr><th>Date</th><th>By</th><th class="num">Old base</th><th class="num">New base</th><th class="num">Old total</th><th class="num">New total</th></tr></thead>
+    <tbody>
+      {% for h in ingredient.history %}
+      <tr>
+        <td>{{ h.changed_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td>{{ h.changed_by }}</td>
+        <td class="num">{{ h.old_cost|money }}</td>
+        <td class="num">{{ h.new_cost|money }}</td>
+        <td class="num">{{ h.old_total|money }}</td>
+        <td class="num fw-semibold">{{ h.new_total|money }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-muted">No price changes recorded yet.</p>
+  {% endif %}
+</div></div>
+{% endblock %}

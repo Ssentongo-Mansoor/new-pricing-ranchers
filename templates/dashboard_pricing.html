@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block heading %}Dashboard{% endblock %}
+{% block content %}
+<div class="rf-hero">
+  <img class="rf-hero-logo" src="{{ url_for('static', filename='img/ranchers-logo.svg') }}" alt="">
+  {% set hr = now.hour %}
+  <h1>{{ 'Good morning' if hr < 12 else 'Good afternoon' if hr < 17 else 'Good evening' }}, {{ current_user.full_name.split(' ')[0] }}</h1>
+  <div class="sub">{{ today.strftime('%A %d %B %Y') }} · pricing &amp; customer allocation</div>
+</div>
+
+<div class="rf-card p-3 mb-3">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h2 class="h6 mb-0"><i class="bi bi-check2-square text-rf-orange"></i> My approvals</h2>
+    <a class="small" href="{{ url_for('approvals.index') }}">Open all</a>
+  </div>
+  <p class="small text-muted mb-2">Price changes, new products and new pricelists you submit are held here until Admin, CEO or Sales Director approve them.</p>
+  {% if my_pending %}
+  <div class="alert alert-warning py-2 small mb-2"><strong>{{ my_pending|length }}</strong> request(s) awaiting approval.</div>
+  {% endif %}
+  <table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Type</th><th>Summary</th><th>Status</th><th>When</th></tr></thead>
+    <tbody>
+    {% for a in my_appr[:8] %}
+      <tr>
+        <td class="small text-capitalize">{{ a.kind }}</td>
+        <td class="small">{{ a.summary }}</td>
+        <td>{% if a.status=='pending' %}<span class="badge bg-warning text-dark">pending</span>{% elif a.status=='approved' %}<span class="badge bg-success">approved</span>{% else %}<span class="badge bg-secondary">declined</span>{% endif %}</td>
+        <td class="small text-muted">{{ a.requested_at.strftime('%d %b') }}</td>
+      </tr>
+    {% else %}<tr><td colspan="4" class="text-muted small text-center py-2">No requests yet.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="rf-kpis" style="grid-template-columns:repeat(5,1fr)">
+  <a href="{{ url_for('customers.onboarding_queue') }}"><div class="rf-kpi"><div class="num" style="color:#B5341F">{{ n_pending }}</div><div class="lbl">Awaiting approval</div></div></a>
+  <a href="{{ url_for('customers.index') }}"><div class="rf-kpi"><div class="num">{{ n_customers }}</div><div class="lbl">Customers</div></div></a>
+  <a href="{{ url_for('pricelists.index') }}"><div class="rf-kpi"><div class="num">{{ n_generic }}</div><div class="lbl">Generic lists</div></div></a>
+  <a href="{{ url_for('customer_pricelists.index') }}"><div class="rf-kpi"><div class="num">{{ n_tailored }}</div><div class="lbl">Tailor-made lists</div></div></a>
+  <div class="rf-kpi"><div class="num" style="color:#B5341F">{{ n_unallocated }}</div><div class="lbl">No pricelist</div></div>
+</div>
+
+{% if pending %}
+<div class="rf-card p-0 mb-3">
+  <div class="p-3 border-bottom fw-semibold"><i class="bi bi-hourglass-split text-rf-orange"></i> New customers awaiting allocation &amp; credit approval <span class="badge badge-danger">{{ n_pending }}</span></div>
+  <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+    <thead><tr><th>Customer</th><th>Registered by</th><th>Proposed terms</th><th></th></tr></thead>
+    <tbody>
+    {% for c in pending %}
+      <tr>
+        <td><a href="{{ url_for('customers.detail', customer_id=c.id) }}" class="fw-semibold">{{ c.name }}</a>
+          <div class="small text-muted">{{ c.category.name if c.category else '—' }}</div></td>
+        <td class="small">{{ c.created_by.full_name if c.created_by else '—' }}</td>
+        <td class="small">{{ c.proposed_payment_terms or '—' }}</td>
+        <td class="text-end"><a class="btn btn-sm btn-primary" href="{{ url_for('customers.edit', customer_id=c.id) }}">Allocate &amp; approve</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endif %}
+
+<div class="rf-card p-0">
+  <div class="p-3 border-bottom fw-semibold d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-exclamation-triangle text-rf-orange"></i> Customers with no pricelist linked</span>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('customers.index') }}"><i class="bi bi-search"></i> All customers</a>
+  </div>
+  {% if unallocated %}
+  <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+    <thead><tr><th>Customer</th><th>Category</th><th>Market</th><th></th></tr></thead>
+    <tbody>
+    {% for c in unallocated %}
+      <tr>
+        <td><a href="{{ url_for('customers.detail', customer_id=c.id) }}" class="fw-semibold">{{ c.name }}</a></td>
+        <td class="small">{{ c.category.name if c.category else '—' }}</td>
+        <td class="small text-capitalize">{{ c.market }}</td>
+        <td class="text-end"><a class="btn btn-sm btn-primary" href="{{ url_for('customers.edit', customer_id=c.id) }}"><i class="bi bi-link-45deg"></i> Allocate</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% if n_unallocated > unallocated|length %}<div class="p-2 small text-muted">Showing first {{ unallocated|length }} of {{ n_unallocated }}.</div>{% endif %}
+  {% else %}<p class="text-muted p-3 mb-0">Every customer has a pricelist linked. 🎉</p>{% endif %}
+</div>
+{% endblock %}

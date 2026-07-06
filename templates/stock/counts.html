@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block heading %}Stock takes{% endblock %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="rf-card p-0">
+      <div class="p-3 border-bottom fw-semibold">Stock takes</div>
+      <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+        <thead><tr><th>When</th><th>Type</th><th>By</th><th class="text-end">Lines</th><th class="text-end">Discrepancies</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+        {% for c in counts %}
+          <tr>
+            <td class="small">{{ c.created_at.strftime('%d %b %Y %H:%M') }}</td>
+            <td>{{ c.kind_label }}</td>
+            <td class="small">{{ c.created_by.full_name if c.created_by else '—' }}</td>
+            <td class="text-end">{{ c.lines|length }}</td>
+            <td class="text-end">{% set d = c.discrepancy_lines|length %}{% if d %}<span class="badge badge-warn">{{ d }}</span>{% else %}0{% endif %}</td>
+            <td>{% if c.status=='posted' %}<span class="badge badge-ok">posted</span>{% else %}<span class="badge bg-secondary">open</span>{% endif %}</td>
+            <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('stock.count_detail', count_id=c.id) }}">Open</a></td>
+          </tr>
+        {% else %}<tr><td colspan="7" class="text-center text-muted py-4">No stock takes yet.</td></tr>{% endfor %}
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+  {% if can_audit %}
+  <div class="col-lg-4">
+    <div class="rf-card p-3">
+      <h2 class="h6">Start a stock take</h2>
+      <form method="post" action="{{ url_for('stock.count_new') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-2"><label class="form-label small">Type</label>
+          <select class="form-select form-select-sm" name="kind">
+            <option value="spot">Spot check</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select></div>
+        <div class="mb-2"><label class="form-label small">Note (optional)</label>
+          <input class="form-control form-control-sm" name="note" placeholder="e.g. Cold room, Friday count"></div>
+        <button class="btn btn-primary btn-sm">Start &amp; count</button>
+      </form>
+    </div>
+    <a class="btn btn-outline-secondary btn-sm mt-2 w-100" href="{{ url_for('stock.report_oos') }}"><i class="bi bi-exclamation-triangle"></i> Out-of-stock report</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "costing/_shell.html" %}
+{% block heading %}Ingredients{% endblock %}
+{% block costing_content %}
+<div class="page-head">
+  <h1>Ingredient Master</h1>
+  <div class="spacer"></div>
+  <form class="d-flex" method="get">
+    <input name="q" value="{{ q }}" class="form-control form-control-sm me-2" placeholder="Search name or alias…" style="width:240px">
+    <button class="btn btn-sm btn-outline-secondary">Search</button>
+  </form>
+  {% if has_perm(current_user, 'edit_costing') %}
+  <a class="btn btn-sm btn-rf" href="{{ url_for('ingredients.new') }}"><i class="bi bi-plus-lg"></i> New Ingredient</a>
+  {% endif %}
+</div>
+
+<div class="card"><div class="card-body">
+  <p class="text-muted small mb-2"><i class="bi bi-info-circle"></i> Total landed cost = base + tax + clearance + freight. {% if has_perm(current_user, 'edit_costing') %}Click a total to edit the base price inline.{% endif %}</p>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead><tr>
+        <th>Name</th><th>Aliases</th><th>UoM</th>
+        <th class="num">Base</th><th class="num">Tax</th><th class="num">Clearance</th><th class="num">Freight</th>
+        <th class="num">Total Landed</th><th></th>
+      </tr></thead>
+      <tbody>
+        {% for i in ingredients %}
+        <tr>
+          <td class="fw-semibold">{{ i.name }}</td>
+          <td class="small text-muted">{{ [i.alias1, i.alias2]|select|join(', ') }}</td>
+          <td>{{ i.uom }}</td>
+          <td class="num">{{ i.base_cost|money }}</td>
+          <td class="num">{{ i.tax_value|money }}</td>
+          <td class="num">{{ i.clearance|money }}</td>
+          <td class="num">{{ i.freight|money }}</td>
+          {% if has_perm(current_user, 'edit_costing') %}
+          <td class="num editable-price fw-semibold text-rf" data-id="{{ i.id }}" data-value="{{ i.total_cost }}" title="Click to edit base price">{{ i.total_cost|money }}</td>
+          {% else %}
+          <td class="num fw-semibold text-rf">{{ i.total_cost|money }}</td>
+          {% endif %}
+          <td class="text-nowrap">
+            <a class="btn btn-sm btn-outline-secondary py-0" href="{{ url_for('ingredients.history', iid=i.id) }}" title="Price history"><i class="bi bi-clock-history"></i></a>
+            {% if has_perm(current_user, 'edit_costing') %}
+            <a class="btn btn-sm btn-outline-secondary py-0" href="{{ url_for('ingredients.edit', iid=i.id) }}"><i class="bi bi-pencil"></i></a>
+            <form class="d-inline" method="post" action="{{ url_for('ingredients.delete', iid=i.id) }}" onsubmit="return confirm('Delete {{ i.name }}?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger py-0"><i class="bi bi-trash"></i></button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="text-muted small">{{ ingredients|length }} ingredient(s)</div>
+</div></div>
+{% endblock %}

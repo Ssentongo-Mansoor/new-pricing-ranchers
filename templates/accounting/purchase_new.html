@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block heading %}Record purchase / expense{% endblock %}
+{% block content %}
+<form method="post" action="{{ url_for('accounting.purchase_create') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+<div class="rf-card p-3 mb-3">
+  <div class="row g-2">
+    <div class="col-md-3"><label class="form-label small">Supplier</label>
+      <select class="form-select" name="supplier_id" required>
+        <option value="">— choose —</option>
+        {% for s in suppliers %}<option value="{{ s.id }}">{{ s.name }}{{ ' (VAT)' if s.vat_registered }}</option>{% endfor %}
+      </select>
+      <div class="form-text"><a href="{{ url_for('accounting.suppliers') }}">Add a supplier</a> if missing.</div></div>
+    <div class="col-md-2"><label class="form-label small">Date</label>
+      <input class="form-control" type="date" name="purchase_date" value="{{ today }}"></div>
+    <div class="col-md-2"><label class="form-label small">Supplier ref</label>
+      <input class="form-control" name="bill_ref" placeholder="their invoice no"></div>
+    <div class="col-md-2"><label class="form-label small">Settled</label>
+      <select class="form-select" name="pay_from">
+        {% for k, lbl in pay_from.items() %}<option value="{{ k }}">{{ lbl }}</option>{% endfor %}
+      </select></div>
+    <div class="col-md-3"><label class="form-label small">Notes</label>
+      <input class="form-control" name="notes" maxlength="255"></div>
+  </div>
+</div>
+
+<div class="table-responsive rf-card">
+<table class="table table-sm align-middle mb-0" id="plines">
+  <thead><tr><th style="width:110px">Type</th><th style="width:34%">Stock item / Expense account</th>
+    <th class="text-end">Qty</th><th class="text-end">Unit cost / Amount (UGX)</th>
+    <th>Note</th><th class="text-center">VAT?</th><th></th></tr></thead>
+  <tbody>
+  {% for i in range(4) %}
+    <tr>
+      <td><select class="form-select form-select-sm ltype" name="ltype">
+        <option value="stock">Stock</option><option value="expense">Expense</option>
+      </select></td>
+      <td>
+        <select class="form-select form-select-sm pick-stock" name="item_id">
+          <option value="">— stock item —</option>
+          {% for it in items %}<option value="{{ it.id }}">[{{ it.stage[:3] }}] {{ it.name }} ({{ it.stock_unit }})</option>{% endfor %}
+        </select>
+        <select class="form-select form-select-sm pick-expense d-none" name="expense_account">
+          <option value="">— expense account —</option>
+          {% for a in expense_accounts %}<option value="{{ a.id }}">{{ a.code }} · {{ a.name }}</option>{% endfor %}
+        </select>
+      </td>
+      <td><input class="form-control form-control-sm text-end qty-f" name="qty" inputmode="decimal" placeholder="qty"></td>
+      <td><input class="form-control form-control-sm text-end" name="unit_cost" inputmode="decimal" placeholder="per unit">
+          <input type="hidden" name="amount" class="amt-mirror"></td>
+      <td><input class="form-control form-control-sm" name="ldesc" maxlength="255"></td>
+      <td class="text-center"><input type="checkbox" name="lvat_cb" onchange="this.nextElementSibling.value=this.checked?'1':'0'"><input type="hidden" name="lvat" value="0"></td>
+      <td class="text-center"><button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1 del"><i class="bi bi-x"></i></button></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<div class="d-flex gap-2 mt-3">
+  <button type="button" class="btn btn-outline-secondary" id="addrow"><i class="bi bi-plus"></i> Add line</button>
+  <button class="btn btn-primary"><i class="bi bi-check2"></i> Post purchase</button>
+  <a class="btn btn-link" href="{{ url_for('accounting.purchases') }}">Cancel</a>
+</div>
+<p class="small text-muted mt-2">Stock lines (livestock, carcasses, ingredients,
+packaging) go INTO INVENTORY and move the item's average cost — never into
+expenses. VAT applies only when the supplier is VAT-registered. Expense lines:
+put the amount in the Unit cost / Amount column; qty stays empty.</p>
+</form>
+
+<script>
+(function(){
+  var tbody = document.querySelector('#plines tbody');
+  function wire(tr){
+    var sel = tr.querySelector('.ltype');
+    function toggle(){
+      var stock = sel.value === 'stock';
+      tr.querySelector('.pick-stock').classList.toggle('d-none', !stock);
+      tr.querySelector('.pick-expense').classList.toggle('d-none', stock);
+      tr.querySelector('.qty-f').disabled = !stock;
+    }
+    sel.addEventListener('change', toggle);
+    toggle();
+    // mirror the single money field into 'amount' for expense lines
+    var money = tr.querySelector('[name=unit_cost]');
+    money.addEventListener('input', function(){
+      tr.querySelector('.amt-mirror').value = sel.value === 'expense' ? money.value : '';
+    });
+    sel.addEventListener('change', function(){
+      tr.querySelector('.amt-mirror').value = sel.value === 'expense' ? money.value : '';
+    });
+    tr.querySelector('.del').addEventListener('click', function(){
+      tr.querySelectorAll('input').forEach(function(i){ if(i.type!=='hidden'||i.name!=='lvat') i.value=''; });
+      tr.querySelectorAll('select').forEach(function(s){ s.selectedIndex = 0; });
+      tr.querySelector('[name=lvat]').value='0';
+    });
+  }
+  tbody.querySelectorAll('tr').forEach(wire);
+  document.getElementById('addrow').addEventListener('click', function(){
+    var tr = tbody.querySelector('tr').cloneNode(true);
+    tr.querySelectorAll('input').forEach(function(i){ i.value = (i.name==='lvat') ? '0' : ''; if(i.type==='checkbox') i.checked=false; });
+    tr.querySelectorAll('select').forEach(function(s){ s.selectedIndex = 0; });
+    tbody.appendChild(tr);
+    wire(tr);
+  });
+})();
+</script>
+{% endblock %}

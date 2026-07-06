@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block heading %}Orders{% endblock %}
+{% block content %}
+{% if works_inbox %}
+<div class="alert alert-secondary py-2 d-flex align-items-center gap-2">
+  <i class="bi bi-inbox-fill text-rf-orange fs-5"></i>
+  <span>Fulfilment inbox: <strong>{{ counts.get('inbox',0) }}</strong> order(s) need action
+    ({{ counts.get('placed',0) }} placed, {{ counts.get('in_fulfillment',0) }} in progress, {{ counts.get('pending',0) }} pending).</span>
+</div>
+{% endif %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div class="btn-group btn-group-sm flex-wrap">
+    {% if works_inbox %}
+    <a class="btn {{ 'btn-primary' if inbox_view else 'btn-outline-secondary' }}" href="{{ url_for('orders.index') }}"><i class="bi bi-inbox"></i> Inbox{% if counts.get('inbox') %} ({{ counts['inbox'] }}){% endif %}</a>
+    {% endif %}
+    <a class="btn {{ 'btn-primary' if (not status and not inbox_view) else 'btn-outline-secondary' }}" href="{{ url_for('orders.index', all=1) }}">All</a>
+    {% for s, lbl in [('draft','Draft'),('submitted','Submitted'),('placed','Placed'),('in_fulfillment','In fulfilment'),('pending','Pending'),('ready_for_dispatch','Ready for dispatch'),('out_for_delivery','Out for delivery'),('delivered','Delivered'),('cancelled','Cancelled')] %}
+    <a class="btn {{ 'btn-primary' if status==s else 'btn-outline-secondary' }}" href="{{ url_for('orders.index', status=s) }}">
+      {{ lbl }}{% if counts.get(s) %} ({{ counts[s] }}){% endif %}</a>
+    {% endfor %}
+  </div>
+  {% if has_perm(current_user, 'create_offers_orders') %}
+  <a class="btn btn-primary" href="{{ url_for('orders.new') }}"><i class="bi bi-plus-lg"></i> New order</a>
+  {% endif %}
+</div>
+
+<div class="input-group mb-2" style="max-width:420px">
+  <span class="input-group-text"><i class="bi bi-search"></i></span>
+  <input type="text" id="orderSearch" class="form-control" placeholder="Search by order number or customer name…" autocomplete="off">
+</div>
+<div class="table-responsive rf-card">
+<table class="table table-hover align-middle mb-0">
+  <thead><tr><th>Number</th><th>Customer</th><th>Currency</th><th>Status</th><th class="text-end">Total</th><th>Order date</th><th>Delivery</th><th></th></tr></thead>
+  <tbody id="orderRows">
+  {% for o in orders %}
+    <tr data-search="{{ (o.number ~ ' ' ~ (o.customer.name if o.customer else ''))|lower }}">
+      <td><a href="{{ url_for('orders.detail', order_id=o.id) }}" class="fw-semibold">{{ o.number }}</a>
+        {% if o.backorder_of_id %}<span class="badge bg-secondary" title="Back order">back order</span>{% endif %}</td>
+      <td>{{ o.customer.name }}</td>
+      <td>{{ o.currency }}</td>
+      <td>
+        {% if o.status=='draft' %}<span class="badge bg-secondary">draft</span>
+        {% elif o.status=='submitted' %}<span class="badge" style="background:#ED1C24">submitted</span>
+        {% elif o.status=='placed' %}<span class="badge bg-dark">placed</span>
+        {% elif o.status=='in_fulfillment' %}<span class="badge" style="background:#F47A21">in fulfilment</span>
+        {% elif o.status=='ready_for_dispatch' %}<span class="badge" style="background:#6E7149">ready for dispatch</span>
+        {% elif o.status=='out_for_delivery' %}<span class="badge" style="background:#2E7D32">out for delivery</span>
+        {% elif o.status=='dispatched' %}<span class="badge" style="background:#2E7D32">dispatched</span>
+        {% elif o.status=='pending' %}<span class="badge badge-warn">pending stock</span>
+        {% elif o.status=='delivered' %}<span class="badge badge-ok">delivered</span>
+        {% elif o.status=='fulfilled' %}<span class="badge badge-ok">fulfilled</span>
+        {% elif o.status=='cancelled' %}<span class="badge badge-danger">cancelled</span>
+        {% else %}<span class="badge bg-secondary">{{ o.status.replace('_',' ') }}</span>{% endif %}
+        {% if order_delay(o)[0] %}<span class="badge badge-danger"><i class="bi bi-alarm"></i> delayed</span>{% endif %}
+      </td>
+      <td class="text-end money">{{ o.total|money(o.currency) }}</td>
+      <td class="small">{{ o.order_date }}</td>
+      <td class="small">{{ o.delivery_date or '—' }}</td>
+      <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('orders.export', order_id=o.id, fmt='pdf') }}"><i class="bi bi-file-earmark-pdf"></i></a></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="8" class="text-center text-muted py-4">No orders yet. Click “New order” to create one.</td></tr>
+  {% endfor %}
+  <tr id="orderNoMatch" class="d-none"><td colspan="8" class="text-center text-muted py-4">No orders match your search.</td></tr>
+  </tbody>
+</table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  var box=document.getElementById('orderSearch'); if(!box) return;
+  var rows=Array.prototype.slice.call(document.querySelectorAll('#orderRows tr[data-search]'));
+  var noMatch=document.getElementById('orderNoMatch');
+  box.addEventListener('input', function(){
+    var q=box.value.trim().toLowerCase(), shown=0;
+    rows.forEach(function(r){
+      var ok=!q || r.getAttribute('data-search').indexOf(q)!==-1;
+      r.classList.toggle('d-none', !ok); if(ok) shown++;
+    });
+    noMatch.classList.toggle('d-none', shown!==0);
+  });
+})();
+</script>
+{% endblock %}

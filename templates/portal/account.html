@@ -1,0 +1,17 @@
+{% extends "portal/base.html" %}
+{% block content %}
+<h1 class="h5 rf-head mb-3">My account</h1>
+<div class="rf-card p-4" style="max-width:460px">
+  <h2 class="h6 mb-3">Change password</h2>
+  <form method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="mb-3"><label class="form-label">Current password</label>
+      <input type="password" name="current_password" class="form-control" required></div>
+    <div class="mb-3"><label class="form-label">New password (min 8)</label>
+      <input type="password" name="new_password" class="form-control" required></div>
+    <div class="mb-3"><label class="form-label">Confirm new password</label>
+      <input type="password" name="confirm_password" class="form-control" required></div>
+    <button class="btn btn-primary">Update password</button>
+  </form>
+</div>
+{% endblock %}

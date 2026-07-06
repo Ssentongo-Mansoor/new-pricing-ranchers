@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block heading %}New journal entry{% endblock %}
+{% block content %}
+<form method="post" action="{{ url_for('accounting.journal_create') }}" id="jeform">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+<div class="rf-card p-3 mb-3">
+  <div class="row g-2">
+    <div class="col-md-3">
+      <label class="form-label small">Date</label>
+      <input class="form-control" type="date" name="entry_date" value="{{ today }}" required>
+    </div>
+    <div class="col-md-9">
+      <label class="form-label small">Memo — what is this entry for?</label>
+      <input class="form-control" name="memo" maxlength="255" placeholder="e.g. June payroll accrual" required>
+    </div>
+  </div>
+</div>
+
+<div class="table-responsive rf-card">
+<table class="table table-sm align-middle mb-0" id="lines">
+  <thead><tr><th style="width:40%">Account</th>
+    <th class="text-end">Debit (UGX)</th><th class="text-end">Credit (UGX)</th>
+    <th>Line note</th><th></th></tr></thead>
+  <tbody>
+  {% for i in range(4) %}
+    <tr>
+      <td><select class="form-select form-select-sm" name="account_id">
+        <option value="">— account —</option>
+        {% for a in accounts %}<option value="{{ a.id }}">{{ a.code }} · {{ a.name }}</option>{% endfor %}
+      </select></td>
+      <td><input class="form-control form-control-sm text-end amt" name="debit" inputmode="decimal" placeholder="0"></td>
+      <td><input class="form-control form-control-sm text-end amt" name="credit" inputmode="decimal" placeholder="0"></td>
+      <td><input class="form-control form-control-sm" name="line_memo" maxlength="255"></td>
+      <td class="text-center"><button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1 del" title="Clear line"><i class="bi bi-x"></i></button></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr class="fw-semibold">
+      <td class="text-end">Totals</td>
+      <td class="text-end" id="tdr">0</td>
+      <td class="text-end" id="tcr">0</td>
+      <td colspan="2" id="balmsg" class="small"></td>
+    </tr>
+  </tfoot>
+</table>
+</div>
+
+<div class="d-flex gap-2 mt-3">
+  <button type="button" class="btn btn-outline-secondary" id="addrow"><i class="bi bi-plus"></i> Add line</button>
+  <button class="btn btn-primary" id="postbtn"><i class="bi bi-check2"></i> Post entry</button>
+  <a class="btn btn-link" href="{{ url_for('accounting.journal') }}">Cancel</a>
+</div>
+<p class="small text-muted mt-2">Debits must equal credits before the entry posts.
+Posted entries cannot be edited or deleted — a mistake is fixed with a reversing entry.</p>
+</form>
+
+<script>
+(function(){
+  var tbody = document.querySelector('#lines tbody');
+  function num(v){ v = parseFloat((v||'').toString().replace(/,/g,'')); return isNaN(v)?0:v; }
+  function recalc(){
+    var dr=0, cr=0;
+    tbody.querySelectorAll('tr').forEach(function(tr){
+      dr += num(tr.querySelector('[name=debit]').value);
+      cr += num(tr.querySelector('[name=credit]').value);
+    });
+    document.getElementById('tdr').textContent = dr.toLocaleString();
+    document.getElementById('tcr').textContent = cr.toLocaleString();
+    var msg = document.getElementById('balmsg'), btn = document.getElementById('postbtn');
+    if (dr===cr && dr>0){ msg.textContent='Balanced ✓'; msg.className='small text-success'; btn.disabled=false; }
+    else if (dr===0 && cr===0){ msg.textContent=''; btn.disabled=true; }
+    else { msg.textContent='Out of balance by ' + Math.abs(dr-cr).toLocaleString(); msg.className='small text-danger'; btn.disabled=true; }
+  }
+  tbody.addEventListener('input', function(e){
+    if (!e.target.classList.contains('amt')) return;
+    var tr = e.target.closest('tr');
+    // one side per line: typing a debit clears the credit and vice versa
+    if (e.target.name==='debit' && e.target.value) tr.querySelector('[name=credit]').value='';
+    if (e.target.name==='credit' && e.target.value) tr.querySelector('[name=debit]').value='';
+    recalc();
+  });
+  tbody.addEventListener('click', function(e){
+    var del = e.target.closest('.del'); if (!del) return;
+    var tr = del.closest('tr');
+    tr.querySelectorAll('input').forEach(function(i){ i.value=''; });
+    tr.querySelector('select').value='';
+    recalc();
+  });
+  document.getElementById('addrow').addEventListener('click', function(){
+    var tr = tbody.querySelector('tr').cloneNode(true);
+    tr.querySelectorAll('input').forEach(function(i){ i.value=''; });
+    tr.querySelector('select').value='';
+    tbody.appendChild(tr);
+    recalc();
+  });
+  recalc();
+})();
+</script>
+{% endblock %}

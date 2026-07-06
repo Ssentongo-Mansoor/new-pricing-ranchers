@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block heading %}Products by month{% endblock %}
+{% macro trendbadge(t) %}
+  {% if t=='new' %}<span class="badge badge-ok">new</span>
+  {% elif t=='up' %}<span class="badge badge-ok"><i class="bi bi-arrow-up"></i> up</span>
+  {% elif t=='down' %}<span class="badge badge-warn"><i class="bi bi-arrow-down"></i> down</span>
+  {% elif t=='stopped' %}<span class="badge badge-danger">stopped</span>
+  {% else %}<span class="badge bg-secondary">steady</span>{% endif %}
+{% endmacro %}
+{% block content %}
+{% include "reports/_nav.html" %}
+
+{% if not has_data %}
+<div class="rf-card p-4"><p class="text-muted mb-0">No monthly product history loaded yet.</p></div>
+{% else %}
+
+<form class="row g-2 align-items-end mb-3" method="get">
+  <div class="col-md-6"><label class="form-label small mb-0">Drill into a product</label>
+    <select class="form-select" name="product" onchange="this.form.submit()">
+      <option value="">— choose a product —</option>
+      {% for n in all_names %}<option value="{{ n }}" {{ 'selected' if drill and drill.name==n }}>{{ n }}</option>{% endfor %}
+    </select></div>
+  <div class="col-auto"><span class="small text-muted">Latest month: {{ latest_label }} · trend = last 3 months vs the 3 before</span></div>
+</form>
+
+{% if drill %}
+<div class="rf-card p-3 mb-3">
+  <h2 class="h6"><i class="bi bi-box-seam text-rf-orange"></i> {{ drill.name }} — monthly</h2>
+  <canvas id="drillChart" height="80"></canvas>
+  <div class="small text-muted mt-2 mb-1">Top customers for this product (net UGX)</div>
+  <div class="row">
+    {% for name, val in drill.top_customers %}
+    <div class="col-md-6"><div class="d-flex justify-content-between border-bottom py-1">
+      <span class="small">{{ name }}</span><span class="small money">{{ '{:,.0f}'.format(val) }}</span></div></div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="d-flex justify-content-between align-items-baseline mb-2 flex-wrap">
+  <h2 class="h6 mb-0"><i class="bi bi-lightning-charge text-rf-orange"></i> Top products</h2>
+  <span class="small text-muted">{% if n_stopped %}<span class="text-danger">{{ n_stopped }}</span> product(s) stopped (no sales in last 3 months){% endif %}</span>
+</div>
+<div class="table-responsive rf-card">
+<table class="table table-sm align-middle mb-0">
+  <thead><tr><th>Product</th><th class="text-end">Total revenue</th><th class="text-end">Total qty</th><th>Last sold</th><th>Trend</th></tr></thead>
+  <tbody>
+  {% for p in products %}
+    <tr class="{{ 'table-danger' if p.trend=='stopped' }}">
+      <td class="small fw-semibold"><a href="{{ url_for('reports.products_monthly', product=p.name) }}">{{ p.name }}</a></td>
+      <td class="text-end money">{{ '{:,.0f}'.format(p.rev) }}</td>
+      <td class="text-end">{{ '{:,.0f}'.format(p.qty) }}</td>
+      <td class="small {{ 'text-danger' if p.trend=='stopped' }}">{{ p.last }}</td>
+      <td>{{ trendbadge(p.trend) }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if drill %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script>
+const ugxTick = v => 'UGX ' + Number(v).toLocaleString();
+(function(){
+  const ctx=document.getElementById('drillChart'); if(!ctx) return;
+  new Chart(ctx,{data:{labels:{{ drill.labels|tojson }},
+    datasets:[
+      {type:'line',label:'Revenue',data:{{ drill.rev|tojson }},borderColor:'#F47A21',backgroundColor:'rgba(244,122,33,0.12)',fill:true,tension:0.3,pointRadius:0,borderWidth:2,yAxisID:'y'},
+      {type:'bar',label:'Quantity',data:{{ drill.qty|tojson }},backgroundColor:'rgba(110,113,73,0.5)',yAxisID:'y1'}
+    ]},
+    options:{plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.dataset.label=='Revenue'?ugxTick(c.parsed.y):c.parsed.y)}}},
+      scales:{x:{ticks:{maxTicksLimit:12,autoSkip:true}},
+        y:{position:'left',ticks:{callback:ugxTick}},
+        y1:{position:'right',grid:{drawOnChartArea:false}}}}});
+})();
+</script>
+{% endif %}
+{% endblock %}

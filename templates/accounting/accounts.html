@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block heading %}Chart of accounts{% endblock %}
+{% block content %}
+<div class="table-responsive rf-card">
+<table class="table table-sm table-hover align-middle mb-0">
+  <thead><tr><th>Code</th><th>Account</th><th>Type</th>
+    <th class="text-end">Balance (UGX)</th><th class="small">Side</th><th class="small">Control key</th></tr></thead>
+  <tbody>
+  {% set typenames = {'asset':'Asset','liability':'Liability','equity':'Equity','income':'Income','cogs':'Cost of goods sold','expense':'Expense'} %}
+  {% for a in accounts %}
+    {% set net = balances.get(a.id, 0) %}
+    <tr class="{{ 'text-muted' if not a.active }}">
+      <td class="fw-semibold">{{ a.code }}</td>
+      <td>{{ a.name }}{% if not a.is_postable %} <span class="badge bg-secondary">header</span>{% endif %}</td>
+      <td class="small">{{ typenames.get(a.type, a.type) }}</td>
+      <td class="text-end">
+        {% if net != 0 %}
+          {{ '{:,}'.format(net if net > 0 else -net) }}
+        {% else %}<span class="text-muted">0</span>{% endif %}
+      </td>
+      <td class="small">{% if net > 0 %}Dr{% elif net < 0 %}Cr{% endif %}</td>
+      <td class="small text-muted">{{ a.system_key or '' }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="small text-muted mt-2">Balances cover posted journal entries only.
+Dr means the account currently carries a debit balance, Cr a credit balance.</p>
+{% endblock %}

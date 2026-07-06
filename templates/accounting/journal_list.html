@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block heading %}Journal{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <form class="d-flex gap-2" method="get">
+    <select class="form-select form-select-sm" name="source" onchange="this.form.submit()">
+      <option value="">All sources</option>
+      {% for s in sources %}<option value="{{ s }}" {{ 'selected' if s==source }}>{{ s|replace('_',' ')|title }}</option>{% endfor %}
+    </select>
+  </form>
+  {% if can_post %}
+  <a class="btn btn-primary" href="{{ url_for('accounting.journal_new') }}"><i class="bi bi-plus-lg"></i> New journal entry</a>
+  {% endif %}
+</div>
+
+<div class="table-responsive rf-card">
+<table class="table table-sm table-hover align-middle mb-0">
+  <thead><tr><th>No</th><th>Date</th><th>Memo</th><th>Source</th>
+    <th class="text-end">Debits (UGX)</th><th class="text-end">Credits (UGX)</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for e in entries %}
+    <tr onclick="window.location='{{ url_for('accounting.journal_view', entry_id=e.id) }}'" style="cursor:pointer">
+      <td class="fw-semibold">{{ e.entry_no or '(draft)' }}</td>
+      <td>{{ e.entry_date.strftime('%d %b %Y') }}</td>
+      <td class="small">{{ e.memo or '—' }}</td>
+      <td class="small">{{ e.source_type|replace('_',' ')|title }}{% if e.reversal_of_id %} <span class="badge bg-secondary">reversal</span>{% endif %}</td>
+      <td class="text-end">{{ '{:,}'.format(e.total_debit) }}</td>
+      <td class="text-end">{{ '{:,}'.format(e.total_credit) }}</td>
+      <td>{% if e.posted %}<span class="badge badge-ok">Posted</span>{% else %}<span class="badge badge-warn">Draft</span>{% endif %}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="7" class="text-center text-muted py-4">No journal entries yet. The ledger starts empty; the first entries come from the opening balances or a manual journal.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if pages > 1 %}
+<nav class="mt-3"><ul class="pagination pagination-sm">
+  {% for p in range(1, pages + 1) %}
+  <li class="page-item {{ 'active' if p==page }}"><a class="page-link" href="{{ url_for('accounting.journal', page=p, source=source) }}">{{ p }}</a></li>
+  {% endfor %}
+</ul></nav>
+{% endif %}
+{% endblock %}

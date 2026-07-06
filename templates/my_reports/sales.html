@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block heading %}My sales{% endblock %}
+{% macro ugx(v) %}UGX {{ '{:,.0f}'.format(v or 0) }}{% endmacro %}
+{% block content %}
+{% include "my_reports/_nav.html" %}
+<div class="rf-card p-3 mb-3">
+  <h2 class="h6"><i class="bi bi-graph-up-arrow text-rf-orange"></i> My sales <span class="text-muted small fw-normal">(last 12 months · latest = month to date)</span></h2>
+  <canvas id="myTrend" height="90"></canvas>
+</div>
+<div class="row g-3">
+  <div class="col-lg-7"><div class="rf-card p-3 h-100">
+    <h2 class="h6">By customer <span class="text-muted small fw-normal">(recent 3 months / lifetime)</span></h2>
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Customer</th><th class="text-end">Recent</th><th class="text-end">Lifetime</th></tr></thead>
+      <tbody>
+      {% for r in by_customer %}
+        <tr><td class="small fw-semibold">{{ r.name }}</td><td class="text-end small">{{ ugx(r.recent) }}</td><td class="text-end small">{{ ugx(r.life) }}</td></tr>
+      {% else %}<tr><td colspan="3" class="text-muted small">No sales yet.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+  <div class="col-lg-5"><div class="rf-card p-3 h-100">
+    <h2 class="h6">By month</h2>
+    <table class="table table-sm align-middle mb-0">
+      <tbody>
+      {% for m in months %}
+        <tr><td class="small">{{ m.label }}</td><td class="text-end small fw-semibold">{{ ugx(m.value) }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script>
+const ugxTick = v => 'UGX ' + Number(v).toLocaleString();
+(function(){
+  const ctx=document.getElementById('myTrend'); if(!ctx) return;
+  const labels={{ labels|tojson }}, vals={{ values|tojson }};
+  const colors=labels.map((_,i)=> i===labels.length-1 ? '#F47A21' : 'rgba(110,113,73,0.55)');
+  new Chart(ctx,{type:'bar',data:{labels:labels,datasets:[{data:vals,backgroundColor:colors,borderRadius:4}]},
+    options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>ugxTick(c.parsed.y)}}},
+      scales:{y:{ticks:{callback:ugxTick}}}}});
+})();
+</script>
+{% endblock %}

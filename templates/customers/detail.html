@@ -1,0 +1,463 @@
+{% extends "base.html" %}
+{% block heading %}{{ customer.name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+  <div>
+    {% if customer.archived %}<span class="badge bg-secondary">archived</span>{% endif %}
+    {% if customer.onboarding_status == 'pending' %}<span class="badge badge-warn"><i class="bi bi-hourglass-split"></i> pending approval</span>
+    {% elif customer.credit_approved %}<span class="badge badge-ok"><i class="bi bi-check2-circle"></i> approved</span>{% endif %}
+  </div>
+  <div class="d-flex gap-2">
+  {% if has_perm(current_user, 'manage_catalogue') %}
+    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('customers.edit', customer_id=customer.id) }}"><i class="bi bi-pencil"></i> Edit</a>
+  {% endif %}
+  {% if current_user.can_manage_all %}
+    {% if customer.archived %}
+    <form method="post" action="{{ url_for('customers.unarchive', customer_id=customer.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-counterclockwise"></i> Restore</button></form>
+    {% else %}
+    <form method="post" action="{{ url_for('customers.archive', customer_id=customer.id) }}" onsubmit="return confirm('Archive {{ customer.name }}? The record is kept and can be restored.')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-secondary"><i class="bi bi-archive"></i> Archive</button></form>
+    {% endif %}
+  {% endif %}
+  {% if current_user.is_admin %}
+    <form method="post" action="{{ url_for('customers.delete', customer_id=customer.id) }}" onsubmit="return confirm('Permanently DELETE {{ customer.name }}? This cannot be undone. (Records with orders/quotes must be archived instead.)')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Delete</button></form>
+  {% endif %}
+  </div>
+</div>
+
+{% if customer.account_status == 'blocked' %}
+<div class="alert alert-danger py-2"><i class="bi bi-shield-exclamation"></i> <strong>Account blocked.</strong>{% if customer.account_note %} {{ customer.account_note }}.{% endif %} New orders cannot be accepted until cleared.</div>
+{% elif customer.account_status == 'on_hold' %}
+<div class="alert alert-warning py-2"><i class="bi bi-exclamation-triangle"></i> <strong>Account on hold.</strong>{% if customer.account_note %} {{ customer.account_note }}.{% endif %}</div>
+{% endif %}
+{% if customer.onboarding_status == 'pending' %}
+<div class="rf-card p-3 mb-3" style="border-left:4px solid var(--rf-warn, #F9A03F)">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <strong><i class="bi bi-hourglass-split text-rf-orange"></i> Awaiting approval</strong>
+      <div class="small text-muted">Registered by {{ customer.created_by.full_name if customer.created_by else '—' }}.
+        Proposed credit terms: <strong>{{ customer.proposed_payment_terms or '—' }}</strong>.
+        {% if can_allocate %}Allocate a pricelist and set the approved terms, then approve.{% else %}The Pricing Officer will allocate a pricelist and approve the credit terms.{% endif %}</div>
+    </div>
+    {% if can_allocate %}
+    <div class="d-flex gap-2">
+      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('customers.edit', customer_id=customer.id) }}"><i class="bi bi-link-45deg"></i> Allocate &amp; set terms</a>
+      <form method="post" action="{{ url_for('customers.approve_onboarding', customer_id=customer.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-sm btn-primary"><i class="bi bi-check2-circle"></i> Approve</button></form>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+<div class="row g-3">
+  <div class="col-lg-5"><div class="rf-card p-4">
+    <h2 class="h6">Details</h2>
+    <dl class="row mb-0 small">
+      <dt class="col-4">Type</dt><dd class="col-8">{% if customer.segment=='distributor' %}<span class="badge" style="background:var(--rf-orange)">Distributor</span>{% else %}<span class="badge bg-secondary">Customer</span>{% endif %}</dd>
+      <dt class="col-4">Category</dt><dd class="col-8">{{ customer.category.name if customer.category else '—' }}</dd>
+      {% if customer.segment=='distributor' %}<dt class="col-4">Area</dt><dd class="col-8">{{ customer.area or '—' }}</dd>{% endif %}
+      <dt class="col-4">Contact</dt><dd class="col-8">{{ customer.contact_name or '—' }}</dd>
+      <dt class="col-4">Email</dt><dd class="col-8">{{ customer.email or '—' }}</dd>
+      <dt class="col-4">Phone</dt><dd class="col-8">{{ customer.phone or '—' }}</dd>
+      <dt class="col-4">Tax ID</dt><dd class="col-8">{{ customer.tax_id or '—' }}</dd>
+      <dt class="col-4">Market</dt><dd class="col-8 text-capitalize">{{ customer.market }}</dd>
+      <dt class="col-4">Currency</dt><dd class="col-8">{{ customer.default_currency }}</dd>
+      <dt class="col-4">Payment terms</dt><dd class="col-8">{{ customer.payment_terms or '—' }}</dd>
+      <dt class="col-4">Reps</dt><dd class="col-8">{{ customer.reps|map(attribute='full_name')|join(', ') or '—' }}</dd>
+      <dt class="col-4">Address</dt><dd class="col-8">{{ customer.address or '—' }}</dd>
+    </dl>
+
+    {% set kc = [('Procurement', customer.procurement_name, customer.procurement_phone, customer.procurement_email),
+                 ('Chef', customer.chef_name, customer.chef_phone, customer.chef_email),
+                 ('Other', customer.other_contact_name, customer.other_contact_phone, customer.other_contact_email)] %}
+    {% if customer.procurement_name or customer.chef_name or customer.other_contact_name %}
+    <h3 class="h6 mt-3 mb-1">Key contacts</h3>
+    <dl class="row mb-0 small">
+      {% for label, nm, tel, em in kc %}{% if nm or tel or em %}
+      <dt class="col-4">{{ label }}</dt>
+      <dd class="col-8">{{ nm or '—' }}{% if tel %} · <a href="tel:{{ tel }}">{{ tel }}</a>{% endif %}{% if em %} · <a href="mailto:{{ em }}">{{ em }}</a>{% endif %}</dd>
+      {% endif %}{% endfor %}
+    </dl>
+    {% endif %}
+
+    {% if customer.delivery_days or customer.delivery_time_from or customer.delivery_notes %}
+    <h3 class="h6 mt-3 mb-1">Delivery acceptance</h3>
+    <div class="small">
+      {% if customer.delivery_days %}<span class="fw-semibold">{{ customer.delivery_days.replace(',', ', ') }}</span>{% endif %}
+      {% if customer.delivery_time_from or customer.delivery_time_to %} · {{ customer.delivery_time_from or '…' }}–{{ customer.delivery_time_to or '…' }}{% endif %}
+      {% if customer.delivery_notes %}<div class="text-muted">{{ customer.delivery_notes }}</div>{% endif %}
+    </div>
+    {% endif %}
+
+    {% if customer.notes %}<h3 class="h6 mt-3 mb-1">Comments</h3><p class="small text-muted mb-0">{{ customer.notes }}</p>{% endif %}
+
+    {% if customer.latitude is not none and customer.longitude is not none %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
+    <div class="mt-3">
+      <div id="map" style="height:240px; border-radius:10px; overflow:hidden; border:1px solid #e4d7c2"></div>
+      <div class="mt-2 d-flex flex-wrap gap-2">
+        <a class="btn btn-sm btn-outline-primary" target="_blank"
+           href="https://www.google.com/maps/search/?api=1&query={{ customer.latitude }},{{ customer.longitude }}"><i class="bi bi-geo-alt"></i> Open in Google Maps</a>
+        <a class="btn btn-sm btn-outline-secondary" target="_blank"
+           href="https://www.google.com/maps/dir/?api=1&destination={{ customer.latitude }},{{ customer.longitude }}"><i class="bi bi-signpost-2"></i> Directions</a>
+        <span class="small text-muted align-self-center">{{ '%.5f'|format(customer.latitude) }}, {{ '%.5f'|format(customer.longitude) }}</span>
+      </div>
+    </div>
+    {% elif current_user.can_manage_all %}
+    <div class="form-text mt-2"><i class="bi bi-geo-alt"></i> No map pin set. <a href="{{ url_for('customers.edit', customer_id=customer.id) }}">Add the location</a>.</div>
+    {% endif %}
+  </div></div>
+  <div class="col-lg-7"><div class="rf-card p-4">
+    {% set own = customer.pricelists|rejectattr('archived')|list %}
+    {% set linked = customer.allowed_pricelists|rejectattr('archived')|list %}
+    <h2 class="h6">Linked pricelists <span class="text-muted small fw-normal">(offered when ordering)</span></h2>
+    <ul class="list-group list-group-flush">
+      {% for p in own %}
+      <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+        <span><a href="{{ url_for('customer_pricelists.detail', list_id=p.id) }}">{{ p.name }}</a> <span class="badge" style="background:var(--rf-orange)">tailor-made</span></span>
+        <span class="badge bg-secondary">{{ p.currency }}</span></li>
+      {% endfor %}
+      {% for p in linked %}
+      <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+        <span><a href="{{ url_for('customer_pricelists.detail' if p.is_customer else 'pricelists.detail', list_id=p.id) }}">{{ p.name }}</a></span>
+        <span class="badge bg-secondary">{{ p.currency }}</span></li>
+      {% endfor %}
+      {% if not own and not linked %}
+      <li class="list-group-item px-0 text-muted">No pricelist linked yet. {% if current_user.can_manage_all %}<a href="{{ url_for('customers.edit', customer_id=customer.id) }}">Link one</a>.{% endif %}</li>
+      {% endif %}
+    </ul>
+    <h2 class="h6 mt-3">Recent quotes</h2>
+    <ul class="list-group list-group-flush">
+      {% for o in customer.offers[:8] %}
+      <li class="list-group-item px-0 d-flex justify-content-between"><a href="{{ url_for('offers.detail', offer_id=o.id) }}">{{ o.number }}</a><span class="money">{{ o.total|money(o.currency) }}</span></li>
+      {% else %}<li class="list-group-item px-0 text-muted">None yet.</li>{% endfor %}
+    </ul>
+  </div></div>
+</div>
+
+{# ----------------------------- Sales history (2024-2026) ----------------------------- #}
+{% if hist_years %}
+<div class="rf-card p-4 mt-3">
+  <h2 class="h6"><i class="bi bi-clock-history text-rf-orange"></i> Sales history
+    <span class="text-muted small fw-normal">(invoiced, untaxed UGX)</span></h2>
+  <div class="row g-3">
+    <div class="col-md-5">
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Year</th><th class="text-end">Revenue</th><th class="text-end">Quantity</th></tr></thead>
+        <tbody>
+        {% for y, v in hist_years.items() %}
+          <tr><td class="fw-semibold">{{ y }}</td>
+            <td class="text-end money">UGX {{ '{:,.0f}'.format(v.rev) }}</td>
+            <td class="text-end">{{ '{:,.0f}'.format(v.qty) }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% if hist_returns %}<div class="small text-danger mt-2">Includes returns/credits: UGX {{ '{:,.0f}'.format(hist_returns) }}</div>{% endif %}
+    </div>
+    <div class="col-md-7">
+      <div class="small text-muted mb-1">Top products (all years)</div>
+      <table class="table table-sm align-middle mb-0">
+        <tbody>
+        {% for name, val in hist_top %}
+          <tr><td class="small">{{ name }}</td><td class="text-end money">UGX {{ '{:,.0f}'.format(val) }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ----------------------------- Invoices (dated history) ----------------------------- #}
+{% if inv_count %}
+<div class="rf-card p-4 mt-3">
+  <h2 class="h6 d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-receipt-cutoff text-rf-orange"></i> Invoices
+      <span class="text-muted small fw-normal">({{ '{:,}'.format(inv_count) }} on record)</span></span>
+    {% if inv_outstanding %}<span class="badge badge-danger">Outstanding UGX {{ '{:,.0f}'.format(inv_outstanding) }}</span>{% endif %}
+  </h2>
+  <div class="table-responsive">
+  <table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Invoice</th><th>Date</th><th>Salesperson</th><th class="text-end">Total</th><th>Payment</th></tr></thead>
+    <tbody>
+    {% for i in inv_recent %}
+      <tr>
+        <td class="small">{{ i.number }}</td>
+        <td class="small">{{ i.invoice_date.strftime('%d %b %Y') if i.invoice_date else '—' }}</td>
+        <td class="small">{{ i.salesperson or '—' }}</td>
+        <td class="text-end money">{{ '{:,.0f}'.format(i.total or 0) }} {{ i.currency }}</td>
+        <td>{% if i.payment_status=='Paid' %}<span class="badge badge-ok">paid</span>
+          {% elif i.payment_status in ['Not Paid','Partially Paid','In Payment'] %}<span class="badge badge-warn">{{ i.payment_status|lower }}</span>
+          {% elif i.payment_status=='Reversed' %}<span class="badge bg-secondary">reversed</span>
+          {% else %}<span class="small text-muted">{{ i.payment_status }}</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if inv_count > inv_recent|length %}<div class="small text-muted mt-1">Showing the {{ inv_recent|length }} most recent of {{ '{:,}'.format(inv_count) }}.</div>{% endif %}
+</div>
+{% endif %}
+
+{# ----------------------------- Deals (pipeline) ----------------------------- #}
+{% if features.pipeline %}
+<a id="deals"></a>
+<div class="rf-card p-4 mt-3">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h2 class="h6 mb-0"><i class="bi bi-kanban text-rf-orange"></i> Deals</h2>
+    {% if can_log %}<button class="btn btn-sm btn-primary" data-bs-toggle="collapse" data-bs-target="#addDeal"><i class="bi bi-plus-lg"></i> New deal</button>{% endif %}
+  </div>
+  {% if can_log %}
+  <div class="collapse mb-2" id="addDeal">
+    <form method="post" action="{{ url_for('crm.add_deal', customer_id=customer.id) }}" class="row g-2">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-md-5"><input class="form-control form-control-sm" name="title" placeholder="Deal title" required></div>
+      <div class="col-md-3"><input class="form-control form-control-sm" name="value" placeholder="Value"></div>
+      <div class="col-md-2">
+        <select class="form-select form-select-sm" name="stage">{% for s in deal_stages %}<option>{{ s }}</option>{% endfor %}</select></div>
+      <div class="col-md-2"><input class="form-control form-control-sm" type="date" name="expected_close"></div>
+      <div class="col-12"><button class="btn btn-sm btn-primary">Add deal</button></div>
+    </form>
+  </div>
+  {% endif %}
+  <div class="table-responsive">
+  <table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Deal</th><th class="text-end">Value</th><th>Stage</th><th>Close</th><th></th></tr></thead>
+    <tbody>
+    {% for d in customer.deals %}
+      <tr>
+        <td class="fw-semibold">{{ d.title }}{% if d.status=='won' %} <span class="badge badge-ok">won</span>{% elif d.status=='lost' %} <span class="badge badge-danger">lost</span>{% endif %}</td>
+        <td class="text-end money">{{ d.value|money(d.currency) if d.value else '—' }}</td>
+        <td>
+          {% if can_log %}
+          <form method="post" action="{{ url_for('crm.update_deal', deal_id=d.id) }}" class="d-inline">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <select class="form-select form-select-sm d-inline-block" style="width:auto" name="stage" onchange="this.form.submit()">
+              {% for s in deal_stages %}<option {{ 'selected' if d.stage==s }}>{{ s }}</option>{% endfor %}
+            </select></form>
+          {% else %}{{ d.stage }}{% endif %}
+        </td>
+        <td class="small">{{ d.expected_close.strftime('%d %b %Y') if d.expected_close else '—' }}</td>
+        <td class="text-end">{% if can_log %}<form method="post" action="{{ url_for('crm.delete_deal', deal_id=d.id) }}" onsubmit="return confirm('Delete this deal?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-link text-muted p-0"><i class="bi bi-trash"></i></button></form>{% endif %}</td>
+      </tr>
+    {% else %}<tr><td colspan="5" class="text-center text-muted py-3">No deals yet.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endif %}
+
+{# ----------------------------- CRM ----------------------------- #}
+<a id="activity"></a>
+<div class="row g-3 mt-1">
+  <div class="col-lg-7"><div class="rf-card p-4">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 class="h6 mb-0"><i class="bi bi-clock-history text-rf-orange"></i> Activity log</h2>
+      {% if can_log %}<button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#logModal"><i class="bi bi-plus-lg"></i> Log visit / call</button>{% endif %}
+    </div>
+    {% set lv = customer.last_visit_at %}{% set lc = customer.last_contact_at %}{% set nf = customer.next_followup %}
+    <div class="row text-center g-2 mb-3">
+      <div class="col"><div class="small text-muted">Last visit</div><div class="fw-semibold">{{ lv.strftime('%d %b %Y') if lv else '—' }}</div></div>
+      <div class="col"><div class="small text-muted">Last contact</div><div class="fw-semibold">{{ lc.strftime('%d %b %Y') if lc else '—' }}</div></div>
+      <div class="col"><div class="small text-muted">Next follow-up</div><div class="fw-semibold {{ 'text-danger' if nf and nf.next_action_date < now.date() }}">{{ nf.next_action_date.strftime('%d %b %Y') if nf else '—' }}</div></div>
+    </div>
+    {% for a in customer.activities %}
+      <div class="d-flex gap-2 pb-3 mb-2 border-bottom">
+        <div><span class="badge rounded-pill bg-secondary"><i class="bi {{ a.kind_icon }}"></i></span></div>
+        <div class="flex-grow-1">
+          <div class="d-flex justify-content-between">
+            <strong>{{ a.kind_label }}{% if a.outcome %} · <span class="text-rf-orange">{{ a.outcome }}</span>{% endif %}</strong>
+            <span class="small text-muted">{{ a.occurred_at.strftime('%d %b %Y · %H:%M') }}</span>
+          </div>
+          <div class="small text-muted">
+            by {{ a.user.full_name if a.user else '—' }}{% if a.contact %} · with {{ a.contact.name }}{% endif %}
+            {% if a.has_gps %} · <a target="_blank" href="https://www.google.com/maps/search/?api=1&query={{ a.latitude }},{{ a.longitude }}"><i class="bi bi-geo-alt-fill"></i> checked in</a>{% endif %}
+            {% if a.recording_url %} · <a target="_blank" href="{{ a.recording_url }}"><i class="bi bi-record-circle"></i> recording</a>{% endif %}
+          </div>
+          {% if a.summary %}<div class="mt-1">{{ a.summary }}</div>{% endif %}
+          {% if a.next_action %}
+          <div class="mt-1 small">
+            <span class="badge {{ 'badge-danger' if a.next_action_date and a.next_action_date < now.date() and not a.follow_up_done else ('badge-ok' if a.follow_up_done else 'badge-warn') }}">
+              <i class="bi bi-flag"></i> follow-up{% if a.next_action_date %} {{ a.next_action_date.strftime('%d %b') }}{% endif %}{% if a.follow_up_done %} · done{% endif %}</span>
+            {{ a.next_action }}
+            {% if can_log %}
+            <form method="post" action="{{ url_for('crm.toggle_followup', activity_id=a.id) }}" class="d-inline">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="next" value="{{ url_for('customers.detail', customer_id=customer.id) }}">
+              <button class="btn btn-link btn-sm p-0 ms-1">{{ 'reopen' if a.follow_up_done else 'mark done' }}</button></form>
+            {% endif %}
+          </div>{% endif %}
+        </div>
+        {% if can_log %}
+        <form method="post" action="{{ url_for('crm.delete_activity', activity_id=a.id) }}" onsubmit="return confirm('Delete this log entry?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-sm btn-link text-muted p-0"><i class="bi bi-trash"></i></button></form>
+        {% endif %}
+      </div>
+    {% else %}<p class="text-muted small">No activity logged yet.</p>{% endfor %}
+  </div></div>
+
+  <div class="col-lg-5"><div class="rf-card p-4">
+    <h2 class="h6"><i class="bi bi-person-lines-fill text-rf-orange"></i> Contacts</h2>
+    <ul class="list-group list-group-flush mb-2">
+      {% for k in customer.contacts %}
+      <li class="list-group-item px-0">
+        <div class="d-flex justify-content-between">
+          <div>
+            <strong>{{ k.name }}</strong>{% if k.is_primary %} <span class="badge" style="background:var(--rf-orange)">primary</span>{% endif %}
+            {% if k.title %}<div class="small text-muted">{{ k.title }}</div>{% endif %}
+            <div class="small">{% if k.phone %}<a href="tel:{{ k.phone }}"><i class="bi bi-telephone"></i> {{ k.phone }}</a>{% endif %}
+              {% if k.email %} · <a href="mailto:{{ k.email }}">{{ k.email }}</a>{% endif %}</div>
+            {% if k.notes %}<div class="small text-muted">{{ k.notes }}</div>{% endif %}
+          </div>
+          {% if can_log %}
+          <form method="post" action="{{ url_for('crm.delete_contact', contact_id=k.id) }}" onsubmit="return confirm('Remove {{ k.name }}?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-link text-muted p-0"><i class="bi bi-trash"></i></button></form>
+          {% endif %}
+        </div>
+      </li>
+      {% else %}<li class="list-group-item px-0 text-muted small">No contacts yet.</li>{% endfor %}
+    </ul>
+    {% if can_log %}
+    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#addContact"><i class="bi bi-plus-lg"></i> Add contact</button>
+    <div class="collapse mt-2" id="addContact">
+      <form method="post" action="{{ url_for('crm.add_contact', customer_id=customer.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="row g-2">
+          <div class="col-7"><input class="form-control form-control-sm" name="name" placeholder="Full name" required></div>
+          <div class="col-5"><input class="form-control form-control-sm" name="title" placeholder="Role / title"></div>
+          <div class="col-7"><input class="form-control form-control-sm" name="phone" placeholder="Phone"></div>
+          <div class="col-5"><input class="form-control form-control-sm" name="email" placeholder="Email"></div>
+          <div class="col-12"><input class="form-control form-control-sm" name="notes" placeholder="Notes (optional)"></div>
+          <div class="col-12 form-check ms-1"><input class="form-check-input" type="checkbox" name="is_primary" value="1" id="cp"><label class="form-check-label small" for="cp">Primary contact</label></div>
+        </div>
+        <button class="btn btn-sm btn-primary mt-2">Save contact</button>
+      </form>
+    </div>
+    {% endif %}
+  </div></div>
+</div>
+
+{% if can_log %}
+<div class="modal fade" id="logModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <form class="modal-content" method="post" action="{{ url_for('crm.add_activity', customer_id=customer.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-header"><h5 class="modal-title">Log activity · {{ customer.name }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-2">
+          <div class="col-md-4"><label class="form-label small">Type</label>
+            <select class="form-select form-select-sm" name="kind" id="logKind">
+              <option value="visit">Visit</option><option value="call">Call</option>
+              <option value="email">Email</option><option value="sms">SMS</option>
+              <option value="meeting">Meeting</option><option value="note">Note</option>
+            </select></div>
+          <div class="col-md-4"><label class="form-label small">When</label>
+            <input class="form-control form-control-sm" type="datetime-local" name="occurred_at" id="logWhen"></div>
+          <div class="col-md-4"><label class="form-label small">Contact</label>
+            <select class="form-select form-select-sm" name="contact_id">
+              <option value="">—</option>
+              {% for k in customer.contacts %}<option value="{{ k.id }}">{{ k.name }}{% if k.title %} ({{ k.title }}){% endif %}</option>{% endfor %}
+            </select></div>
+          <div class="col-md-6" id="dirWrap"><label class="form-label small">Direction</label>
+            <select class="form-select form-select-sm" name="direction">
+              <option value="outbound">Outbound</option><option value="inbound">Inbound</option></select></div>
+          <div class="col-md-6"><label class="form-label small">Outcome</label>
+            <input class="form-control form-control-sm" name="outcome" list="outcomeList" id="logOutcome" placeholder="Result of the contact">
+            <datalist id="outcomeList"></datalist></div>
+          <div class="col-12" id="subjWrap" style="display:none"><label class="form-label small">Subject (email)</label>
+            <input class="form-control form-control-sm" name="subject" placeholder="Email subject"></div>
+          <div class="col-12"><label class="form-label small" id="summaryLbl">What transpired</label>
+            <textarea class="form-control form-control-sm" name="summary" rows="3" placeholder="Notes from the visit / call…"></textarea></div>
+          {% if features.telephony %}
+          <div class="col-12" id="recWrap" style="display:none"><label class="form-label small">Call recording link (optional)</label>
+            <input class="form-control form-control-sm" name="recording_url" placeholder="https://…"></div>
+          {% endif %}
+          {% if features.email or features.sms %}
+          <div class="col-12 form-check ms-1" id="sendWrap" style="display:none">
+            <input class="form-check-input" type="checkbox" name="send_now" value="1" id="sendNow">
+            <label class="form-check-label small" for="sendNow">Send now to the selected contact (needs it configured under Admin → Features)</label>
+          </div>
+          {% endif %}
+          <div class="col-md-7"><label class="form-label small">Next action (optional)</label>
+            <input class="form-control form-control-sm" name="next_action" placeholder="e.g. Send revised quote"></div>
+          <div class="col-md-5"><label class="form-label small">Follow-up date</label>
+            <input class="form-control form-control-sm" type="date" name="next_action_date"></div>
+        </div>
+        <div class="mt-3 p-2 rounded" style="background:#fbf2e7" id="gpsWrap">
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="gpsBtn"><i class="bi bi-geo-alt"></i> Capture my location (check-in)</button>
+            <span class="small text-muted" id="gpsState">Optional — proves you were on site.</span>
+          </div>
+          <input type="hidden" name="latitude" id="gpsLat"><input type="hidden" name="longitude" id="gpsLng">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-link" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary"><i class="bi bi-save"></i> Save log entry</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+(function(){
+  var VIS={{ visit_outcomes|tojson }}, CALL={{ call_outcomes|tojson }};
+  var kind=document.getElementById('logKind'), dl=document.getElementById('outcomeList');
+  var dirWrap=document.getElementById('dirWrap'), gpsWrap=document.getElementById('gpsWrap');
+  function show(id, on){ var e=document.getElementById(id); if(e) e.style.display = on ? '' : 'none'; }
+  function refresh(){
+    var k = kind.value;
+    var list = k==='call' ? CALL : (k==='visit' ? VIS : []);
+    dl.innerHTML=''; list.forEach(function(o){ var op=document.createElement('option'); op.value=o; dl.appendChild(op); });
+    dirWrap.style.display = k==='call' ? '' : 'none';
+    gpsWrap.style.display = k==='visit' ? '' : 'none';
+    show('subjWrap', k==='email');
+    show('recWrap', k==='call');
+    show('sendWrap', k==='email' || k==='sms');
+    var lbl=document.getElementById('summaryLbl');
+    if(lbl) lbl.textContent = (k==='email'||k==='sms') ? 'Message' : 'What transpired';
+  }
+  kind.addEventListener('change', refresh); refresh();
+  var w=document.getElementById('logWhen');
+  if(w && !w.value){ var d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); w.value=d.toISOString().slice(0,16); }
+  var btn=document.getElementById('gpsBtn');
+  if(btn) btn.addEventListener('click', function(){
+    var st=document.getElementById('gpsState');
+    if(!navigator.geolocation){ st.textContent='Location not available on this device.'; return; }
+    st.textContent='Locating…';
+    navigator.geolocation.getCurrentPosition(function(p){
+      document.getElementById('gpsLat').value=p.coords.latitude.toFixed(6);
+      document.getElementById('gpsLng').value=p.coords.longitude.toFixed(6);
+      st.innerHTML='<span class="text-success">Location captured ('+p.coords.latitude.toFixed(4)+', '+p.coords.longitude.toFixed(4)+')</span>';
+    }, function(){ st.textContent='Could not get location (permission denied).'; });
+  });
+})();
+</script>
+{% endif %}
+
+{% if customer.latitude is not none and customer.longitude is not none %}
+<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+<script>
+(function(){
+  var el=document.getElementById('map');
+  if(!el || typeof L==='undefined') return;
+  var lat={{ customer.latitude }}, lng={{ customer.longitude }};
+  var icon=L.icon({
+    iconUrl:"{{ url_for('static', filename='vendor/leaflet/images/marker-icon.png') }}",
+    iconRetinaUrl:"{{ url_for('static', filename='vendor/leaflet/images/marker-icon-2x.png') }}",
+    shadowUrl:"{{ url_for('static', filename='vendor/leaflet/images/marker-shadow.png') }}",
+    iconSize:[25,41], iconAnchor:[12,41], shadowSize:[41,41]});
+  var map=L.map('map').setView([lat,lng],16);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+  L.marker([lat,lng],{icon:icon}).addTo(map);
+  setTimeout(function(){ map.invalidateSize(); },200);
+})();
+</script>
+{% endif %}
+{% endblock %}

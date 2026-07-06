@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Error {{ code }}{% endblock %}
+{% block heading %}Error {{ code }}{% endblock %}
+{% block content %}
+<div class="rf-card p-5 text-center">
+  <div class="display-4 rf-head text-rf-orange">{{ code }}</div>
+  <p class="lead">{{ message }}</p>
+  <a class="btn btn-primary" href="{{ url_for('dashboard.home') }}">Back to dashboard</a>
+</div>
+{% endblock %}
+{% block fullpage %}
+<div class="rf-login-wrap"><div class="text-center">
+  <div class="display-3 rf-head text-rf-orange">{{ code }}</div>
+  <p class="lead">{{ message }}</p>
+  <a class="btn btn-primary" href="{{ url_for('auth.login') }}">Sign in</a>
+</div></div>
+{% endblock %}

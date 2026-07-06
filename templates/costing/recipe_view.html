@@ -1,0 +1,91 @@
+{% extends "costing/_shell.html" %}
+{% block heading %}Recipe{% endblock %}
+{% block costing_content %}
+<div class="page-head">
+  <h1>{{ recipe.name }}
+    {% if recipe.status=='inactive' %}<span class="badge bg-secondary align-middle">Inactive</span>{% else %}<span class="badge bg-success align-middle">Active</span>{% endif %}
+  </h1>
+  <div class="spacer"></div>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('pricing.detail', rid=recipe.id) }}"><i class="bi bi-tags"></i> Pricing</a>
+  {% if has_perm(current_user, 'edit_costing') %}
+  <a class="btn btn-sm btn-rf" href="{{ url_for('recipes.edit', rid=recipe.id) }}"><i class="bi bi-pencil"></i> Edit</a>
+  <form class="d-inline" method="post" action="{{ url_for('recipes.copy', rid=recipe.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-files"></i> Copy</button>
+  </form>
+  <button class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#toggleModal">
+    {{ 'Activate' if recipe.status=='inactive' else 'Deactivate' }}
+  </button>
+  {% endif %}
+</div>
+
+<div class="row">
+  <div class="col-lg-8">
+    <div class="card mb-3"><div class="card-body">
+      <div class="d-flex justify-content-between text-muted small mb-2">
+        <span>Category: <strong>{{ recipe.category.name if recipe.category else '—' }}</strong></span>
+        <span>{{ recipe.batch_label or '' }}</span>
+      </div>
+      <table class="table table-sm align-middle">
+        <thead><tr><th>Ingredient</th><th class="num">Weight %</th><th class="num">Mass (kg)</th><th class="num">Cost/kg</th><th class="num">Batch cost</th></tr></thead>
+        <tbody>
+          {% for d in b.lines %}
+          <tr>
+            <td>{{ d.name }}
+              {% if d.line.ingredient %}<a href="{{ url_for('ingredients.index', q=d.line.ingredient.name) }}" class="badge bg-light text-muted text-decoration-none">ingredient</a>
+              {% elif d.line.spice_mix %}<a href="{{ url_for('spice_mixes.view', mid=d.line.spice_mix.id) }}" class="badge bg-warning-subtle text-dark text-decoration-none">spice mix</a>
+              {% else %}<span class="badge bg-light text-muted">fixed</span>{% endif %}
+            </td>
+            <td class="num">{{ '%.2f'|format((d.mass/b.total_mass*100) if b.total_mass else 0) }}%</td>
+            <td class="num">{{ '%.3f'|format(d.mass) }}</td>
+            <td class="num">{{ d.unit_cost|money }}</td>
+            <td class="num">{{ d.batch_cost|money }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="fw-semibold"><td>Total batch</td><td class="num">100%</td><td class="num">{{ '%.3f'|format(b.total_mass) }}</td><td></td><td class="num">{{ b.batch_cost|money }}</td></tr>
+        </tfoot>
+      </table>
+    </div></div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card builder-totals"><div class="card-body">
+      <h6 class="text-muted text-uppercase small">Cost breakdown (UGX/kg)</h6>
+      <table class="table table-sm mb-0">
+        <tr><td>Mince / emulsion</td><td class="num">{{ b.mince|money }}</td></tr>
+        <tr><td>Casing{% if recipe.casing_type %} <span class="text-muted small">({{ recipe.casing_type }})</span>{% endif %}</td><td class="num">{{ b.casing|money }}</td></tr>
+        <tr class="fw-semibold border-top"><td>Product cost/kg</td><td class="num">{{ b.product_cost|money }}</td></tr>
+        <tr><td>Overhead{% if recipe.overhead_override is none %} <span class="text-muted small">(global)</span>{% endif %}</td><td class="num">{{ b.overhead|money }}</td></tr>
+        <tr><td>Packaging</td><td class="num">{{ b.packaging|money }}</td></tr>
+        {% for e in b.extras %}<tr><td>{{ e.name }}</td><td class="num">{{ e.value|money }}</td></tr>{% endfor %}
+        <tr class="table-active fw-bold border-top"><td>Final cost/kg</td><td class="num text-rf">{{ b.final|money }}</td></tr>
+      </table>
+    </div></div>
+    {% if recipe.note %}<div class="alert alert-light mt-3 small">{{ recipe.note }}</div>{% endif %}
+  </div>
+</div>
+
+{% if has_perm(current_user, 'edit_costing') %}
+<div class="modal fade" id="toggleModal"><div class="modal-dialog"><div class="modal-content">
+  <form method="post" action="{{ url_for('recipes.toggle', rid=recipe.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="modal-header"><h5 class="modal-title">{{ 'Activate' if recipe.status=='inactive' else 'Deactivate' }} recipe</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      {% if recipe.status=='active' %}
+      <p>Retire <strong>{{ recipe.name }}</strong>? It stays in the database and can be reactivated anytime.</p>
+      <label class="form-label">Reason (optional)</label>
+      <input name="reason" class="form-control" placeholder="e.g. raw material unavailable">
+      {% else %}
+      <p>Reactivate <strong>{{ recipe.name }}</strong>? Cost/kg recalculates from current prices.</p>
+      {% endif %}
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-link" data-bs-dismiss="modal">Cancel</button>
+      <button class="btn btn-rf">{{ 'Activate' if recipe.status=='inactive' else 'Deactivate' }}</button>
+    </div>
+  </form>
+</div></div></div>
+{% endif %}
+{% endblock %}

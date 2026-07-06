@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block heading %}Admin{% endblock %}
+{% macro colsel(name, label, allow_none=True) %}
+  <div class="col-md-3 mb-2">
+    <label class="form-label small">{{ label }}</label>
+    <select class="form-select form-select-sm" name="{{ name }}">
+      {% if allow_none %}<option value="none">— none —</option>{% endif %}
+      {% for i, letter in col_letters %}<option value="{{ i }}">{{ letter }} (col {{ i+1 }})</option>{% endfor %}
+    </select>
+  </div>
+{% endmacro %}
+{% block content %}
+{% include "admin/_nav.html" %}
+<h2 class="h6">Map columns · sheet “{{ sheet }}”</h2>
+<p class="small text-muted">Preview of the first rows. Note the column letters, the header row and the first data row, then map below.</p>
+
+<div class="table-responsive rf-card mb-3">
+<table class="table table-sm table-bordered mb-0" style="font-size:.78rem">
+  <thead><tr><th>Row</th>{% for i, letter in col_letters %}<th>{{ letter }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for r in preview.rows %}
+    <tr><td class="fw-bold bg-light">{{ r.row }}</td>
+      {% for cell in r.cells %}<td>{{ cell if cell is not none else '' }}</td>{% endfor %}</tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<form method="post" action="{{ url_for('admin.upload_commit') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="sheet" value="{{ sheet }}">
+  <div class="rf-card p-3 mb-3">
+    <h3 class="h6">List details</h3>
+    <div class="row">
+      <div class="col-md-6 mb-2"><label class="form-label small">Pricelist name</label>
+        <input class="form-control form-control-sm" name="name" value="{{ sheet }}" required></div>
+      <div class="col-md-2 mb-2"><label class="form-label small">Channel</label>
+        <select class="form-select form-select-sm" name="channel"><option value="horeca">HORECA</option><option value="supermarket">Supermarket</option><option value="mixed">Mixed</option></select></div>
+      <div class="col-md-2 mb-2"><label class="form-label small">Market</label>
+        <select class="form-select form-select-sm" name="market"><option value="local">Local</option><option value="export">Export</option></select></div>
+      <div class="col-md-2 mb-2"><label class="form-label small">Currency</label>
+        <select class="form-select form-select-sm" name="currency"><option>UGX</option><option>USD</option></select></div>
+    </div>
+    <div class="row align-items-end">
+      <div class="col-md-3 mb-2 form-check ms-2">
+        <input class="form-check-input" type="checkbox" name="is_customer" value="1" id="isc" onchange="document.getElementById('custsel').classList.toggle('d-none', !this.checked)">
+        <label class="form-check-label small" for="isc">This is a customer pricelist</label></div>
+      <div class="col-md-4 mb-2 d-none" id="custsel"><label class="form-label small">Customer</label>
+        <select class="form-select form-select-sm" name="customer_id">
+          <option value="">—</option>
+          {% for c in customers %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+        </select></div>
+    </div>
+  </div>
+
+  <div class="rf-card p-3 mb-3">
+    <h3 class="h6">Rows</h3>
+    <div class="row">
+      <div class="col-md-3 mb-2"><label class="form-label small">Header row number</label>
+        <input class="form-control form-control-sm" name="header_row" type="number" value="1"></div>
+      <div class="col-md-3 mb-2"><label class="form-label small">First data row number</label>
+        <input class="form-control form-control-sm" name="data_start" type="number" value="2"></div>
+    </div>
+  </div>
+
+  <div class="rf-card p-3 mb-3">
+    <h3 class="h6">Identity columns</h3>
+    <div class="row">
+      {{ colsel('art_col', 'Article number') }}
+      {{ colsel('barcode_col', 'Barcode') }}
+      {{ colsel('desc_col', 'Description (required)', allow_none=False) }}
+      {{ colsel('pack_col', 'Pack size') }}
+    </div>
+    <p class="small text-muted mb-0">Leave Article number as “none” for lists keyed only by description (synthetic codes are generated).</p>
+  </div>
+
+  <div class="rf-card p-3 mb-3">
+    <h3 class="h6">Box packing (optional)</h3>
+    <div class="row">
+      {{ colsel('box_small_col', 'Box Small') }}
+      {{ colsel('box_medium_col', 'Box Medium') }}
+      {{ colsel('box_large_col', 'Box Large') }}
+    </div>
+  </div>
+
+  <div class="rf-card p-3 mb-3">
+    <h3 class="h6">Price tiers</h3>
+    <p class="small text-muted">Map each price column to a label (e.g. “Price Excl VAT”, “Distributor Price”). Up to 8.</p>
+    {% for i in range(8) %}
+    <div class="row align-items-end mb-1">
+      <div class="col-md-3"><select class="form-select form-select-sm" name="tier_col_{{ i }}">
+        <option value="none">— none —</option>
+        {% for idx, letter in col_letters %}<option value="{{ idx }}">{{ letter }} (col {{ idx+1 }})</option>{% endfor %}
+      </select></div>
+      <div class="col-md-5"><input class="form-control form-control-sm" name="tier_label_{{ i }}" placeholder="Tier label"></div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <button class="btn btn-primary">Import pricelist</button>
+  <a class="btn btn-link" href="{{ url_for('admin.upload') }}">Cancel</a>
+</form>
+{% endblock %}

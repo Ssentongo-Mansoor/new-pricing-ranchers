@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block heading %}{{ 'Credit note' if invoice.is_credit_note else 'Invoice' }} {{ invoice.invoice_no }}{% endblock %}
+{% block content %}
+<div class="rf-card p-3 mb-3">
+  <div class="row small">
+    <div class="col-md-3"><span class="text-muted">Customer</span><br>{{ invoice.buyer_name or '—' }}
+      {% if invoice.buyer_tin %}<br><span class="text-muted">TIN {{ invoice.buyer_tin }}</span>{% endif %}</div>
+    <div class="col-md-2"><span class="text-muted">Date</span><br>{{ invoice.invoice_date.strftime('%d %b %Y') }}</div>
+    <div class="col-md-2"><span class="text-muted">Order</span><br>
+      {% if invoice.order %}{{ invoice.order.number }}{% else %}—{% endif %}</div>
+    <div class="col-md-2"><span class="text-muted">Journal</span><br>
+      {% if invoice.journal_entry %}<a href="{{ url_for('accounting.journal_view', entry_id=invoice.journal_entry_id) }}">{{ invoice.journal_entry.entry_no }}</a>{% endif %}</div>
+    <div class="col-md-3"><span class="text-muted">Totals ({{ invoice.currency }})</span><br>
+      Net {{ '{:,}'.format(invoice.net_minor) }} · VAT {{ '{:,}'.format(invoice.vat_minor) }} ·
+      <strong>Gross {{ '{:,}'.format(invoice.gross_minor) }}</strong>
+      {% if invoice.fx_rate %}<br><span class="text-muted">@ {{ invoice.fx_rate }} UGX</span>{% endif %}</div>
+  </div>
+</div>
+
+<div class="rf-card p-3 mb-3">
+  {% if invoice.efris_status == 'fiscalized' %}
+  <span class="badge badge-ok">Fiscalized</span>
+  <span class="small ms-2">FDN <strong>{{ invoice.efris_fdn }}</strong> ·
+    Verification {{ invoice.efris_verification_code }} ·
+    {{ invoice.fiscalized_at.strftime('%d %b %Y %H:%M') if invoice.fiscalized_at }}</span>
+  {% elif invoice.efris_status == 'failed' %}
+  <span class="badge badge-danger">EFRIS failed after retries</span>
+  <span class="small ms-2 text-muted">Retry from the invoice list once URA is reachable.</span>
+  {% else %}
+  <span class="badge badge-warn">Fiscalization pending</span>
+  <span class="small ms-2 text-muted">TAX INVOICE prints without an FDN until URA confirms. The sale is already in the books.</span>
+  {% endif %}
+</div>
+
+<div class="table-responsive rf-card">
+<table class="table table-sm align-middle mb-0">
+  <thead><tr><th>Description</th><th class="text-end">Qty</th>
+    <th class="text-end">Unit price</th><th class="text-end">Net</th>
+    <th class="text-end">VAT %</th><th class="text-end">VAT</th></tr></thead>
+  <tbody>
+  {% for l in invoice.lines %}
+    <tr>
+      <td>{{ l.description }}</td>
+      <td class="text-end">{{ '%g'|format(l.qty) }}</td>
+      <td class="text-end">{{ '{:,}'.format(l.unit_price_minor) }}</td>
+      <td class="text-end">{{ '{:,}'.format(l.net_minor) }}</td>
+      <td class="text-end">{{ '%g'|format(l.vat_rate) if l.vat_rate else '' }}</td>
+      <td class="text-end">{{ '{:,}'.format(l.vat_minor) if l.vat_minor else '' }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if invoice.cogs_minor %}
+<p class="small text-muted mt-2">Cost of goods on this document:
+UGX {{ '{:,}'.format(invoice.cogs_minor) }} at weighted average.</p>
+{% endif %}
+{% if invoice.cogs_skipped %}
+<div class="alert alert-warning small mt-2">Sold WITHOUT valuation (no costed
+stock at sale time) — margin on these lines is unmeasured until their items are
+costed: {{ invoice.cogs_skipped }}</div>
+{% endif %}
+
+{% for cn in invoice.credit_notes %}
+<div class="alert alert-danger small">Credited by
+  <a href="{{ url_for('accounting.invoice_view', inv_id=cn.id) }}">{{ cn.invoice_no }}</a></div>
+{% endfor %}
+{% if invoice.reverses %}
+<div class="alert alert-info small">Credits invoice
+  <a href="{{ url_for('accounting.invoice_view', inv_id=invoice.reverses.id) }}">{{ invoice.reverses.invoice_no }}</a></div>
+{% endif %}
+
+{% if can_credit and not invoice.is_credit_note and invoice.status != 'credited' %}
+<div class="rf-card p-3 mt-3">
+  <h6>Raise a credit note</h6>
+  <p class="small text-muted mb-2">Reverses the journal, restocks the valued
+  inventory, and submits a fiscal credit note to URA against FDN
+  {{ invoice.efris_fdn or '(pending)' }}. The original invoice stays on the books.</p>
+  <form method="post" action="{{ url_for('accounting.invoice_credit_note', inv_id=invoice.id) }}" class="d-flex gap-2 flex-wrap"
+        onsubmit="return confirm('Post a credit note for {{ invoice.invoice_no }}? This reverses the full invoice.');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input class="form-control" name="reason" style="max-width:360px" placeholder="Reason (goes to the audit trail)" required>
+    <label class="small align-self-center"><input type="checkbox" name="restock" value="1" checked> goods returned to stock</label>
+    <button class="btn btn-outline-danger"><i class="bi bi-arrow-counterclockwise"></i> Post credit note</button>
+  </form>
+</div>
+{% endif %}
+
+<a class="btn btn-link mt-3 px-0" href="{{ url_for('accounting.invoices') }}">&larr; Back to invoices</a>
+{% endblock %}

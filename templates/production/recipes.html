@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block heading %}Production — recipe links{% endblock %}
+{% block content %}
+<p class="text-muted">Each finished product is linked to its recipe. Confirm the name matches once. Linked products can be exploded into raw materials.</p>
+
+<div class="card mb-4">
+  <div class="card-body d-flex justify-content-between align-items-center flex-wrap">
+    <div>
+      <div class="fw-semibold">{{ recipe_count }} recipe(s) held in this app</div>
+      <div class="text-muted small">
+        {% if last_synced %}Last synced from costing {{ last_synced.strftime('%d %b %Y %H:%M') }}.{% else %}Not yet synced from costing.{% endif %}
+        Recipes are still edited in the costing app, so re-sync after changes there.
+      </div>
+    </div>
+    {% if can_map %}
+    <form method="post" action="{{ url_for('production.recipe_sync_now') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-outline-primary"><i class="bi bi-arrow-repeat"></i> Sync from costing</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if proposals %}
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span class="fw-semibold">Suggested matches ({{ proposals|length }})</span>
+    {% if can_map %}
+    <form method="post" action="{{ url_for('production.recipe_confirm_all') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-sm btn-primary">Confirm all</button>
+    </form>
+    {% endif %}
+  </div>
+  <div class="table-responsive">
+  <table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Product</th><th>Suggested recipe</th>{% if can_map %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+    {% for pr in proposals %}
+      <tr>
+        <td>{{ pr.product.description }} <span class="text-muted small">{{ pr.product.article_no }}</span></td>
+        <td>
+          {% if can_map %}
+          <form method="post" action="{{ url_for('production.recipe_map') }}" class="d-flex gap-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="product_id" value="{{ pr.product.id }}">
+            <select name="recipe_id" class="form-select form-select-sm" style="max-width:320px">
+              {% for r in all_recipes %}<option value="{{ r.id }}" {{ 'selected' if r.id==pr.recipe.id }}>{{ r.name }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-sm btn-outline-primary">Confirm</button>
+          </form>
+          {% else %}{{ pr.recipe.name }}{% endif %}
+        </td>
+        {% if can_map %}<td></td>{% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-header fw-semibold">Linked products ({{ mapped|length }})</div>
+  <div class="table-responsive">
+  <table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Product</th><th>Recipe</th><th>Method</th>{% if can_map %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+    {% for m in mapped %}
+      <tr>
+        <td><a href="{{ url_for('production.product_detail', product_id=m.product.id) }}">{{ m.product.description }}</a>
+            <span class="text-muted small">{{ m.product.article_no }}</span></td>
+        <td>{{ m.map.recipe_name }}</td>
+        <td class="small text-muted">{{ m.map.match_method }}</td>
+        {% if can_map %}
+        <td class="text-end">
+          <form method="post" action="{{ url_for('production.recipe_unmap') }}" class="d-inline" onsubmit="return confirm('Remove this link?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="product_id" value="{{ m.product.id }}">
+            <button class="btn btn-sm btn-outline-danger">Unlink</button>
+          </form>
+        </td>
+        {% endif %}
+      </tr>
+    {% else %}
+      <tr><td colspan="4" class="text-muted">No links yet. Confirm the suggestions above.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "portal/base.html" %}
+{% block content %}
+<h1 class="h5 rf-head mb-3">Messages with {{ company_name }}</h1>
+<div class="rf-card p-3" style="max-width:760px">
+  <div class="chat mb-3" style="max-height:55vh; overflow:auto">
+    {% for m in msgs %}
+      <div class="bubble {{ 'me' if m.sender_type=='customer' else 'them' }}">
+        {{ m.body }}
+        {% if m.order_id %}<div class="mt-1"><a class="btn btn-sm btn-primary py-0" href="{{ url_for('portal.order', order_id=m.order_id) }}"><i class="bi bi-box-arrow-up-right"></i> Open order to rate</a></div>{% endif %}
+        <div class="meta">{{ 'You' if m.sender_type=='customer' else (m.sender_name or 'Ranchers Finest') }} · {{ m.created_at.strftime('%d %b %H:%M') }}</div>
+      </div>
+    {% else %}
+      <p class="text-muted text-center py-3">No messages yet. Send us a note below — your rep and our team will see it.</p>
+    {% endfor %}
+  </div>
+  <form method="post" class="d-flex gap-2">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input class="form-control" name="body" placeholder="Type a message…" autocomplete="off" required>
+    <button class="btn btn-primary"><i class="bi bi-send"></i></button>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}<script>var c=document.querySelector('.chat'); if(c) c.scrollTop=0;</script>{% endblock %}

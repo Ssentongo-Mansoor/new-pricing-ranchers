@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block heading %}Price promotions{% endblock %}
+{% macro ugx(v, c) %}{{ c }} {{ '{:,.0f}'.format(v or 0) }}{% endmacro %}
+{% block content %}
+<h1 class="h5 mb-3">Price promotions</h1>
+
+<div class="rf-card p-3 mb-4">
+  <h2 class="h6 mb-2"><i class="bi bi-tag text-rf-orange"></i> New promotion</h2>
+  <p class="small text-muted mb-3">Set a temporary price for one product on one pricelist. It ends on the earlier of the end date or the quantity cap, then the normal price returns. Set an end date, a quantity cap, or both.</p>
+  <form method="post" action="{{ url_for('price_promos.create') }}" class="row g-2 align-items-end">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="col-md-4">
+      <label class="form-label small mb-0">Pricelist</label>
+      <select class="form-select form-select-sm" name="pricelist_id" required>
+        <option value="">— choose —</option>
+        {% for pl in pricelists %}<option value="{{ pl.id }}">{{ pl.name }} ({{ pl.currency }})</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small mb-0">Product article no.</label>
+      <input class="form-control form-control-sm" name="article_no" placeholder="e.g. WS181A" required>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small mb-0">Price tier</label>
+      <input class="form-control form-control-sm" name="tier_key" placeholder="default" list="tierkeys">
+      <datalist id="tierkeys"><option value="excl_vat"><option value="incl_vat"><option value="price"></datalist>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small mb-0">Promo price</label>
+      <input class="form-control form-control-sm" name="promo_amount" inputmode="numeric" required>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small mb-0">Start</label>
+      <input type="date" class="form-control form-control-sm" name="start_date" value="{{ today.isoformat() }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small mb-0">End date (optional)</label>
+      <input type="date" class="form-control form-control-sm" name="end_date">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small mb-0">Quantity cap (optional)</label>
+      <input class="form-control form-control-sm" name="qty_cap" inputmode="numeric" placeholder="e.g. 500">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small mb-0">Note</label>
+      <input class="form-control form-control-sm" name="note" placeholder="e.g. Festive offer">
+    </div>
+    <div class="col-12"><button class="btn btn-primary btn-sm mt-1">Create promotion</button></div>
+  </form>
+</div>
+
+<div class="rf-card p-0">
+  <table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Product</th><th>Pricelist</th><th class="text-end">Promo price</th><th>Window</th><th>Cap / sold</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td class="small fw-semibold">{{ r.product }}</td>
+        <td class="small">{{ r.pricelist }}</td>
+        <td class="text-end small" style="color:#F47A21">{{ ugx(r.p.promo_amount, r.currency) }}</td>
+        <td class="small">{{ r.p.start_date.strftime('%d %b') if r.p.start_date else '—' }}{% if r.p.end_date %} → {{ r.p.end_date.strftime('%d %b %Y') }}{% else %} → open{% endif %}</td>
+        <td class="small">{% if r.p.qty_cap is not none %}{{ '%g'|format(r.sold or 0) }} / {{ '%g'|format(r.p.qty_cap) }}{% else %}—{% endif %}</td>
+        <td>
+          {% set s = r.status %}
+          {% if s=='running' %}<span class="badge bg-success">running</span>
+          {% elif s=='scheduled' %}<span class="badge bg-info text-dark">scheduled</span>
+          {% elif s=='pending approval' %}<span class="badge bg-warning text-dark">pending approval</span>
+          {% elif s in ['expired','cap reached','ended'] %}<span class="badge bg-secondary">{{ s }}</span>
+          {% elif s=='declined' %}<span class="badge bg-danger">declined</span>
+          {% else %}<span class="badge bg-light text-dark">{{ s }}</span>{% endif %}
+        </td>
+        <td class="text-end">
+          {% if r.p.status in ['active','pending'] %}
+          <form method="post" action="{{ url_for('price_promos.end', promo_id=r.p.id) }}" onsubmit="return confirm('End this promotion now?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-danger">End now</button></form>
+          {% endif %}
+        </td>
+      </tr>
+    {% else %}<tr><td colspan="7" class="text-center text-muted py-3">No promotions yet.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

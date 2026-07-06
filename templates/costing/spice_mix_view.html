@@ -1,0 +1,35 @@
+{% extends "costing/_shell.html" %}
+{% block heading %}Spice Mix{% endblock %}
+{% block costing_content %}
+<div class="page-head">
+  <h1>{{ mix.name }}</h1>
+  <div class="spacer"></div>
+  {% if has_perm(current_user, 'edit_costing') %}
+  <a class="btn btn-sm btn-rf" href="{{ url_for('spice_mixes.edit', mid=mix.id) }}"><i class="bi bi-pencil"></i> Edit</a>
+  <form class="d-inline" method="post" action="{{ url_for('spice_mixes.delete', mid=mix.id) }}" onsubmit="return confirm('Delete {{ mix.name }}? Blocked if any recipe uses it.')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>
+  {% endif %}
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('spice_mixes.index') }}">Back</a>
+</div>
+<div class="card" style="max-width:820px"><div class="card-body">
+  {% if mix.note %}<p class="text-muted">{{ mix.note }}</p>{% endif %}
+  <table class="table table-sm align-middle">
+    <thead><tr><th>Ingredient</th><th class="num">Weight %</th><th class="num">Mass (kg)</th><th class="num">Cost/kg</th><th class="num">Batch cost</th></tr></thead>
+    <tbody>
+      {% for line, unit, batch in lines %}
+      <tr>
+        <td>{{ line.display_name }}{% if line.ingredient %} <span class="badge bg-light text-muted">linked</span>{% endif %}</td>
+        <td class="num">{{ '%.2f'|format((line.mass_kg/total_mass*100) if total_mass else 0) }}%</td>
+        <td class="num">{{ '%.3f'|format(line.mass_kg) }}</td>
+        <td class="num">{{ unit|money }}</td>
+        <td class="num">{{ batch|money }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr class="fw-semibold"><td>Total</td><td class="num">100%</td><td class="num">{{ '%.3f'|format(total_mass) }}</td><td></td><td class="num">{{ batch|money }}</td></tr>
+      <tr class="table-active fw-bold"><td colspan="4">Spice cost per kg (excl VAT)</td><td class="num text-rf">{{ cost_per_kg|money }}</td></tr>
+    </tfoot>
+  </table>
+</div></div>
+{% endblock %}

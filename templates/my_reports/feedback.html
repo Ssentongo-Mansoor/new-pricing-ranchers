@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block heading %}Feedback{% endblock %}
+{% block content %}
+{% include "my_reports/_nav.html" %}
+<div class="row g-3 mb-3">
+  <div class="col-md-4"><div class="rf-card p-3 h-100 text-center">
+    <div class="text-muted small text-uppercase">Average rating</div>
+    <div class="h2 mb-0" style="color:#F9A03F">{% if avg is none %}—{% else %}{{ avg }} <span style="font-size:1rem">/ 5</span>{% endif %}</div>
+    <div class="small text-muted">{{ n }} rated{% if low %} · <span class="text-danger">{{ low|length }} poor</span>{% endif %}</div>
+  </div></div>
+  <div class="col-md-8"><div class="rf-card p-3 h-100">
+    <h2 class="h6">Recent ratings</h2>
+    <ul class="list-group list-group-flush mb-0">
+      {% for o in rated[:20] %}
+      <li class="list-group-item px-0 py-2">
+        <span style="color:#F9A03F">{% for i in range(1,6) %}{{ '★' if i <= o.rating else '☆' }}{% endfor %}</span>
+        <span class="small text-muted">· {{ o.customer.name if o.customer else '—' }} · <a href="{{ url_for('orders.detail', order_id=o.id) }}">{{ o.number }}</a></span>
+        {% if o.rating_comment %}<div class="small">“{{ o.rating_comment }}”</div>{% endif %}
+      </li>
+      {% else %}<li class="list-group-item px-0 text-muted small">No ratings from your customers yet.</li>{% endfor %}
+    </ul>
+  </div></div>
+</div>
+{% endblock %}

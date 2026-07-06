@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block heading %}My customers{% endblock %}
+{% macro ugx(v) %}UGX {{ '{:,.0f}'.format(v or 0) }}{% endmacro %}
+{% block content %}
+{% include "my_reports/_nav.html" %}
+<div class="rf-card p-0">
+  <table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Customer</th><th>Status</th><th>Last order</th><th class="text-end">Recent</th><th class="text-end">Lifetime</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td class="fw-semibold small"><a href="{{ url_for('customers.detail', customer_id=r.customer.id) }}">{{ r.customer.name }}</a></td>
+        <td>
+          {% if r.status=='active' %}<span class="badge bg-success">active</span>
+          {% elif r.status=='quiet' %}<span class="badge bg-warning text-dark">quiet</span>
+          {% else %}<span class="badge bg-danger">lapsed</span>{% endif %}
+        </td>
+        <td class="small">{{ r.last.strftime('%b %Y') if r.last else '—' }}</td>
+        <td class="text-end small">{{ ugx(r.recent) }}</td>
+        <td class="text-end small">{{ ugx(r.life) }}</td>
+      </tr>
+    {% else %}<tr><td colspan="5" class="text-center text-muted py-3">No customers assigned to you yet.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

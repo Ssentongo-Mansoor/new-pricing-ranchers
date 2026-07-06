@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block heading %}Inventory worklist{% endblock %}
+{% block content %}
+<p class="small text-muted">Items here are excluded from valuation until their
+unit and cost story is complete. Nothing is ever valued at a guess.</p>
+
+<div class="rf-card p-3 mb-3">
+  <h6>Stocked but not costable — {{ blocked|length }}</h6>
+  <div class="table-responsive">
+  <table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Item</th><th class="text-end">Stock qty</th><th>Unit</th>
+      <th>Why blocked</th>{% if can_post %}<th style="width:40%">Fix (pack weight kg and/or manual cost UGX)</th>{% endif %}</tr></thead>
+    <tbody>
+    {% for item, qty, reason in blocked %}
+      <tr>
+        <td><a href="{{ url_for('accounting.inventory_item', item_id=item.id) }}">{{ item.name }}</a></td>
+        <td class="text-end">{{ '%g'|format(qty) }}</td>
+        <td class="small">{{ item.stock_unit or '?' }}</td>
+        <td class="small text-danger">{{ reason }}</td>
+        {% if can_post %}
+        <td>
+          <form method="post" action="{{ url_for('accounting.inventory_item_costing', item_id=item.id) }}" class="d-flex gap-1">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input class="form-control form-control-sm" name="pack_weight_kg" placeholder="pack kg" style="width:90px">
+            <input class="form-control form-control-sm" name="manual_cost" placeholder="UGX/unit" style="width:110px">
+            <button class="btn btn-sm btn-primary py-0 px-2">Save</button>
+          </form>
+        </td>
+        {% endif %}
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="text-muted text-center py-3">Every stocked finished item has a cost. Clean.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<div class="rf-card p-3 mb-3">
+  <h6>Ready for opening load — {{ ready|length }}</h6>
+  <div class="table-responsive">
+  <table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Item</th><th class="text-end">Qty</th>
+      <th class="text-end">Unit cost (UGX)</th><th class="text-end">Opening value</th><th>Source</th></tr></thead>
+    <tbody>
+    {% set total = namespace(v=0) %}
+    {% for item, qty, cost, source in ready %}
+      {% set val = (qty * cost)|round|int %}
+      {% set total.v = total.v + val %}
+      <tr>
+        <td><a href="{{ url_for('accounting.inventory_item', item_id=item.id) }}">{{ item.name }}</a></td>
+        <td class="text-end">{{ '%g'|format(qty) }} {{ item.stock_unit or '' }}</td>
+        <td class="text-end">{{ '{:,}'.format(cost) }}</td>
+        <td class="text-end">{{ '{:,}'.format(val) }}</td>
+        <td class="small">{{ source }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="text-muted text-center py-3">Nothing pending — opening stock is loaded or no costed items carry stock.</td></tr>
+    {% endfor %}
+    </tbody>
+    {% if ready %}
+    <tfoot><tr class="fw-semibold"><td colspan="3" class="text-end">Total opening value</td>
+      <td class="text-end">{{ '{:,}'.format(total.v) }}</td><td></td></tr></tfoot>
+    {% endif %}
+  </table>
+  </div>
+</div>
+
+<div class="rf-card p-3 mb-3">
+  <h6>No unit defined — {{ unitless|length }}</h6>
+  <p class="small text-muted mb-2">Mostly store items (raw materials, packaging).
+  They join valuation when purchases start booking in Phase 4; setting units now
+  saves work later.</p>
+  <div class="table-responsive" style="max-height:400px;overflow:auto">
+  <table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Item</th><th>Stage</th>{% if can_post %}<th style="width:30%">Set unit</th>{% endif %}</tr></thead>
+    <tbody>
+    {% for item in unitless %}
+      <tr>
+        <td>{{ item.name }}</td>
+        <td class="small">{{ item.stage_label }}</td>
+        {% if can_post %}
+        <td>
+          <form method="post" action="{{ url_for('accounting.inventory_item_costing', item_id=item.id) }}" class="d-flex gap-1">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <select class="form-select form-select-sm" name="stock_unit" style="width:90px">
+              <option value="">—</option><option>kg</option><option>pack</option><option>pc</option>
+            </select>
+            <button class="btn btn-sm btn-outline-primary py-0 px-2">Save</button>
+          </form>
+        </td>
+        {% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<a class="btn btn-link px-0" href="{{ url_for('accounting.inventory') }}">&larr; Back to inventory</a>
+{% endblock %}

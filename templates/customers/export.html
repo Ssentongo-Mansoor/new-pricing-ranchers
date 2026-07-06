@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block heading %}Export customers{% endblock %}
+{% block content %}
+<h1 class="h5 mb-3">Export customers to Excel</h1>
+<form method="get" action="{{ url_for('customers.export_xlsx') }}">
+  <div class="rf-card p-3 mb-3">
+    <h2 class="h6 mb-3">Filters</h2>
+    <div class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label small">Activity</label>
+        <select class="form-select" name="status">
+          <option value="all">All</option>
+          <option value="active" selected>Active only</option>
+          <option value="inactive">Not active only</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small">Rep</label>
+        <select class="form-select" name="rep">
+          <option value="">All reps</option>
+          {% for r in reps %}<option value="{{ r.id }}">{{ r.full_name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small">Category</label>
+        <select class="form-select" name="category">
+          <option value="">All categories</option>
+          {% for ct in categories %}<option value="{{ ct.id }}">{{ ct.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small">Type</label>
+        <select class="form-select" name="segment">
+          <option value="customer" selected>Customers</option>
+          <option value="distributor">Distributors</option>
+          <option value="all">Both</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small">Active window</label>
+        <select class="form-select" name="months">
+          <option value="3">Bought in last 3 months</option>
+          <option value="6" selected>Bought in last 6 months</option>
+          <option value="12">Bought in last 12 months</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small">Sort by</label>
+        <select class="form-select" name="sort">
+          <option value="name" selected>Name</option>
+          <option value="rep">Rep</option>
+          <option value="status">Activity</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="rf-card p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 class="h6 mb-0">Columns to include</h2>
+      <div><a href="#" class="small me-2" onclick="setCols(true);return false">Select all</a><a href="#" class="small" onclick="setCols(false);return false">Clear</a></div>
+    </div>
+    <div class="row">
+      {% for key, label, w in columns %}
+      <div class="col-md-4 col-lg-3">
+        <div class="form-check">
+          <input class="form-check-input col-cb" type="checkbox" name="col" value="{{ key }}" id="c_{{ key }}" {{ 'checked' if key in default_cols }}>
+          <label class="form-check-label small" for="c_{{ key }}">{{ label }}</label>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <button class="btn btn-primary"><i class="bi bi-file-earmark-excel"></i> Download Excel</button>
+  <a class="btn btn-link" href="{{ url_for('customers.index') }}">Cancel</a>
+</form>
+<script>
+function setCols(v){ document.querySelectorAll('.col-cb').forEach(function(c){ c.checked=v; }); }
+</script>
+{% endblock %}

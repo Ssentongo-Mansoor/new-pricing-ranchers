@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block heading %}Admin{% endblock %}
+{% block content %}
+{% include "admin/_nav.html" %}
+<form method="post" style="max-width:760px">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="rf-card p-4 mb-3">
+    <h2 class="h6 mb-1">Optional features</h2>
+    <p class="form-text mt-0">Everything here is off by default. Turn on what you want — nothing else changes.</p>
+    {% for name, label, desc in features %}
+    <div class="form-check form-switch py-2 border-bottom">
+      <input class="form-check-input" type="checkbox" role="switch" id="f_{{ name }}" name="feat:{{ name }}" {{ 'checked' if flags[name] }}>
+      <label class="form-check-label" for="f_{{ name }}"><strong>{{ label }}</strong>
+        <div class="small text-muted">{{ desc }}</div></label>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="rf-card p-4 mb-3">
+    <h2 class="h6 mb-1">Email sending (SMTP)</h2>
+    <p class="form-text mt-0">Needed for the Email feature. Leave blank to log emails only without sending.</p>
+    <div class="row g-2">
+      <div class="col-md-8"><label class="form-label small">SMTP host</label>
+        <input class="form-control form-control-sm" name="smtp_host" value="{{ comms.smtp_host }}" placeholder="smtp.gmail.com"></div>
+      <div class="col-md-4"><label class="form-label small">Port</label>
+        <input class="form-control form-control-sm" name="smtp_port" value="{{ comms.smtp_port }}" placeholder="587"></div>
+      <div class="col-md-6"><label class="form-label small">Username</label>
+        <input class="form-control form-control-sm" name="smtp_user" value="{{ comms.smtp_user }}"></div>
+      <div class="col-md-6"><label class="form-label small">Password</label>
+        <input class="form-control form-control-sm" type="password" name="smtp_pass" value="{{ comms.smtp_pass }}" placeholder="{{ '••••••' if comms.smtp_pass else '' }}"></div>
+      <div class="col-md-12"><label class="form-label small">From address</label>
+        <input class="form-control form-control-sm" name="smtp_from" value="{{ comms.smtp_from }}" placeholder="sales@ranchersfinest.com"></div>
+    </div>
+  </div>
+
+  <div class="rf-card p-4 mb-3">
+    <h2 class="h6 mb-1">SMS gateway</h2>
+    <p class="form-text mt-0">Needed for the SMS feature. Africa's Talking is supported. Leave blank to log SMS only.</p>
+    <div class="row g-2">
+      <div class="col-md-4"><label class="form-label small">Provider</label>
+        <input class="form-control form-control-sm" name="sms_provider" value="{{ comms.sms_provider }}" placeholder="africastalking"></div>
+      <div class="col-md-4"><label class="form-label small">Username</label>
+        <input class="form-control form-control-sm" name="sms_username" value="{{ comms.sms_username }}"></div>
+      <div class="col-md-4"><label class="form-label small">Sender ID</label>
+        <input class="form-control form-control-sm" name="sms_sender" value="{{ comms.sms_sender }}" placeholder="RANCHERS"></div>
+      <div class="col-md-12"><label class="form-label small">API key</label>
+        <input class="form-control form-control-sm" type="password" name="sms_api_key" value="{{ comms.sms_api_key }}" placeholder="{{ '••••••' if comms.sms_api_key else '' }}"></div>
+    </div>
+  </div>
+
+  <button class="btn btn-primary">Save features</button>
+</form>
+{% endblock %}

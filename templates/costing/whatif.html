@@ -1,0 +1,86 @@
+{% extends "costing/_shell.html" %}
+{% block heading %}What-If{% endblock %}
+{% block costing_content %}
+<div class="page-head"><h1>What-If Impact Analysis</h1></div>
+<div class="card mb-3"><div class="card-body">
+  <div class="row g-3 align-items-end">
+    <div class="col-md-5">
+      <label class="form-label">Ingredient</label>
+      <select id="ingSelect" class="form-select">
+        {% for i in ingredients %}<option value="{{ i.id }}" data-cost="{{ i.total_cost }}">{{ i.name }} ({{ i.total_cost|money }})</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">New total cost/kg</label>
+      <input id="newCost" type="number" step="0.01" class="form-control">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Quick</label>
+      <select id="quickPct" class="form-select">
+        <option value="">Custom</option>
+        <option value="10">+10%</option>
+        <option value="20">+20%</option>
+        <option value="-10">-10%</option>
+      </select>
+    </div>
+    <div class="col-md-2"><button id="runBtn" class="btn btn-rf w-100">Run</button></div>
+  </div>
+</div></div>
+
+<div id="resultWrap" style="display:none">
+  <div class="alert alert-light" id="summaryLine"></div>
+  <div class="card"><div class="card-body">
+    <table class="table table-hover align-middle">
+      <thead><tr>
+        <th>Product</th><th>Category</th>
+        <th class="num">Old cost/kg</th><th class="num">New cost/kg</th>
+        <th class="num">Δ Cost</th><th class="num">Δ %</th>
+        <th class="num">Margin before</th><th class="num">Margin after</th>
+      </tr></thead>
+      <tbody id="resultBody"></tbody>
+    </table>
+  </div></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const sel = document.getElementById('ingSelect');
+const newCost = document.getElementById('newCost');
+const quick = document.getElementById('quickPct');
+function baseCost(){ return parseFloat(sel.selectedOptions[0].dataset.cost||0); }
+function fmt(v){ return Math.round(v).toLocaleString('en-US'); }
+sel.addEventListener('change', () => { newCost.value = baseCost().toFixed(2); });
+quick.addEventListener('change', () => {
+  if (quick.value) newCost.value = (baseCost() * (1 + parseFloat(quick.value)/100)).toFixed(2);
+});
+newCost.value = baseCost().toFixed(2);
+
+{% if request.args.get('ingredient') %}sel.value = "{{ request.args.get('ingredient') }}"; newCost.value = baseCost().toFixed(2);{% endif %}
+
+document.getElementById('runBtn').addEventListener('click', () => {
+  const t0 = performance.now();
+  fetch('/what-if/run', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ingredient_id: sel.value, new_cost: newCost.value})})
+    .then(r=>r.json()).then(d => {
+      if (!d.ok) { alert(d.error); return; }
+      const ms = (performance.now()-t0).toFixed(0);
+      document.getElementById('resultWrap').style.display = 'block';
+      document.getElementById('summaryLine').innerHTML =
+        `<strong>${d.ingredient}</strong>: ${fmt(d.old_total)} &rarr; ${fmt(d.new_total)} UGX/kg · `
+        + `<strong>${d.count}</strong> product(s) affected · computed in ${ms} ms`;
+      const tb = document.getElementById('resultBody'); tb.innerHTML = '';
+      d.rows.forEach(r => {
+        const up = r.delta >= 0;
+        tb.insertAdjacentHTML('beforeend', `<tr>
+          <td class="fw-semibold">${r.name}</td><td class="small text-muted">${r.category}</td>
+          <td class="num">${fmt(r.before)}</td><td class="num">${fmt(r.after)}</td>
+          <td class="num ${up?'text-danger':'text-success'}">${up?'+':''}${fmt(r.delta)}</td>
+          <td class="num ${up?'text-danger':'text-success'}">${up?'+':''}${r.pct.toFixed(1)}%</td>
+          <td class="num">${r.margin_before.toFixed(0)}%</td>
+          <td class="num ${r.margin_after < r.margin_before ?'text-danger':'text-success'}">${r.margin_after.toFixed(0)}%</td>
+        </tr>`);
+      });
+    });
+});
+</script>
+{% endblock %}

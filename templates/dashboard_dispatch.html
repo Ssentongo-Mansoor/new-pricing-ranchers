@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block heading %}Dispatch desk{% endblock %}
+{% macro dstatus(o) %}
+  {% if o.status=='ready_for_dispatch' and not o.assigned_driver_id %}<span class="badge" style="background:#ED1C24">needs driver</span>
+  {% elif o.status=='ready_for_dispatch' and not o.driver_accepted_at %}<span class="badge badge-warn">awaiting driver</span>
+  {% elif o.status=='out_for_delivery' %}<span class="badge" style="background:#2E7D32">out for delivery</span>
+  {% else %}<span class="badge bg-secondary">{{ o.status }}</span>{% endif %}
+{% endmacro %}
+{% block content %}
+
+<div class="rf-hero">
+  <img class="rf-hero-logo" src="{{ url_for('static', filename='img/ranchers-logo.svg') }}" alt="">
+  {% set hr = now.hour %}
+  <h1>{{ 'Good morning' if hr < 12 else 'Good afternoon' if hr < 17 else 'Good evening' }}, {{ current_user.full_name.split(' ')[0] }}</h1>
+  <div class="sub">{{ today.strftime('%A %d %B %Y') }} · dispatch &amp; delivery</div>
+</div>
+
+{% if to_assign or awaiting_accept or late %}
+<div class="d-flex flex-column gap-2 mb-3">
+  {% if to_assign %}
+  <a class="text-decoration-none" href="{{ url_for('orders.index') }}">
+    <div class="alert alert-danger d-flex align-items-center gap-2 mb-0 py-2"><i class="bi bi-person-badge fs-5"></i>
+      <span><strong>{{ to_assign|length }}</strong> order(s) ready and waiting for a driver.</span></div></a>
+  {% endif %}
+  {% if awaiting_accept %}
+  <div class="alert alert-warning d-flex align-items-center gap-2 mb-0 py-2"><i class="bi bi-hourglass-split fs-5"></i>
+    <span><strong>{{ awaiting_accept|length }}</strong> assigned order(s) the driver has not accepted yet.</span></div>
+  {% endif %}
+  {% if late %}
+  <div class="alert alert-warning d-flex align-items-center gap-2 mb-0 py-2"><i class="bi bi-alarm fs-5"></i>
+    <span><strong>{{ late|length }}</strong> delivery(ies) running late.</span></div>
+  {% endif %}
+</div>
+{% else %}
+<div class="alert alert-success py-2 mb-3"><i class="bi bi-check2-circle"></i> Nothing waiting to dispatch right now.</div>
+{% endif %}
+
+<div class="rf-kpis mb-3" style="grid-template-columns:repeat(5,1fr)">
+  <a href="{{ url_for('orders.index') }}"><div class="rf-kpi"><div class="num" style="color:#ED1C24">{{ to_assign|length }}</div><div class="lbl">Need a driver</div></div></a>
+  <a href="{{ url_for('orders.index') }}"><div class="rf-kpi"><div class="num" style="color:#F9A03F">{{ awaiting_accept|length }}</div><div class="lbl">Awaiting driver</div></div></a>
+  <a href="{{ url_for('orders.index') }}"><div class="rf-kpi"><div class="num" style="color:#2E7D32">{{ en_route|length }}</div><div class="lbl">Out for delivery</div></div></a>
+  <a href="{{ url_for('orders.index') }}"><div class="rf-kpi"><div class="num" style="color:#6E7149">{{ ready|length }}</div><div class="lbl">Ready total</div></div></a>
+  <a href="{{ url_for('orders.index', all=1) }}"><div class="rf-kpi"><div class="num">{{ delivered_today|length }}</div><div class="lbl">Delivered today</div></div></a>
+</div>
+
+<div class="rf-card p-3 mb-3">
+  <h2 class="h6 d-flex justify-content-between"><span><i class="bi bi-box-seam text-rf-orange"></i> Active deliveries</span>
+    <a class="small" href="{{ url_for('orders.index') }}">Open orders</a></h2>
+  <div class="table-responsive">
+  <table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Order</th><th>Customer</th><th>Status</th><th>Driver</th><th></th></tr></thead>
+    <tbody>
+    {% for o in (to_assign + awaiting_accept + en_route) %}
+      <tr {% if order_delay(o)[0] %}class="table-danger"{% endif %}>
+        <td><a href="{{ url_for('orders.detail', order_id=o.id) }}">{{ o.number }}</a></td>
+        <td class="small">{{ o.customer.name }}</td>
+        <td>{{ dstatus(o) }}</td>
+        <td class="small">{{ o.assigned_driver.full_name if o.assigned_driver else '—' }}</td>
+        <td class="text-end"><a class="btn btn-sm btn-outline-primary py-0" href="{{ url_for('orders.detail', order_id=o.id) }}">{{ 'Re-assign' if o.assigned_driver else 'Assign' }}</a></td>
+      </tr>
+    {% else %}<tr><td colspan="5" class="text-center text-muted py-3">Nothing in dispatch.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<div class="rf-card p-3">
+  <h2 class="h6"><i class="bi bi-people text-rf-orange"></i> Deliveries in hand per driver</h2>
+  {% if load_labels %}<canvas id="loadChart" height="120"></canvas>
+  {% else %}<p class="text-muted small mt-3">No active deliveries assigned.</p>{% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script>
+const RF = {orange:'#F47A21', olive:'#6E7149', green:'#2E7D32'};
+(function(){
+  const ctx=document.getElementById('loadChart'); if(!ctx) return;
+  new Chart(ctx,{type:'bar',data:{labels:{{ load_labels|tojson }},
+    datasets:[{data:{{ load_values|tojson }},backgroundColor:RF.olive}]},
+    options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0}},y:{ticks:{font:{size:10}}}}}});
+})();
+</script>
+{% endblock %}

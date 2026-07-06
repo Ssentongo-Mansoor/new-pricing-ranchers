@@ -1,0 +1,148 @@
+{% extends "portal/base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h4 rf-head mb-0">Welcome, {{ cust.name }}</h1>
+  <a class="btn btn-primary" href="{{ url_for('portal.order_new') }}"><i class="bi bi-plus-lg"></i> Place a new order</a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-8">
+    {% if promos %}
+      {% for p in promos %}
+      <div class="rf-card mb-3 overflow-hidden">
+        <div class="p-3 p-md-4">
+          <h2 class="h5 rf-head mb-1"><i class="bi bi-megaphone text-rf-orange"></i> {{ p.title }}</h2>
+          {% if p.body %}<p class="mb-2" style="white-space:pre-line">{{ p.body }}</p>{% endif %}
+          {% if p.valid_until %}<div class="small text-muted mb-2">Valid until {{ p.valid_until }}</div>{% endif %}
+        </div>
+        {% if p.image_filename %}
+        <div class="text-center px-3 pb-3" style="background:#faf4ec">
+          <a href="{{ url_for('portal.promo_image', promo_id=p.id) }}" target="_blank">
+            <img src="{{ url_for('portal.promo_image', promo_id=p.id) }}" alt="{{ p.title }}"
+                 style="max-width:100%; max-height:560px; width:auto; height:auto; display:inline-block">
+          </a>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="rf-card p-4 h-100 d-flex flex-column justify-content-center">
+        <h2 class="h5 rf-head"><i class="bi bi-shop text-rf-orange"></i> Welcome to your portal</h2>
+        <p class="text-muted mb-3">Browse your pricelist, place an order, and track it through to delivery.</p>
+        <div><a class="btn btn-primary" href="{{ url_for('portal.order_new') }}"><i class="bi bi-plus-lg"></i> Place an order</a></div>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-4">
+    <div class="rf-card h-100 d-flex flex-column">
+      <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+        <span class="fw-semibold rf-head"><i class="bi bi-chat-dots text-rf-orange"></i> Messages
+          {% if unread_msgs %}<span class="badge badge-danger">{{ unread_msgs }}</span>{% endif %}</span>
+        <a class="small" href="{{ url_for('portal.messages') }}">Open</a>
+      </div>
+      <div class="p-2 flex-grow-1" style="max-height:300px; overflow:auto">
+        {% for m in recent_msgs %}
+          <a href="{{ url_for('portal.order', order_id=m.order_id) if m.order_id else url_for('portal.messages') }}" class="d-block text-decoration-none p-2 rounded mb-1"
+             style="background:{{ '#FBE3CC' if m.sender_type=='staff' and not m.read_by_customer else '#f7f1e8' }}">
+            <div class="d-flex justify-content-between">
+              <span class="small fw-semibold" style="color:#2B2B2B">{{ 'Ranchers Finest' if m.sender_type=='staff' else 'You' }}</span>
+              <span class="text-muted" style="font-size:.7rem">{{ m.created_at.strftime('%d %b') }}</span>
+            </div>
+            <div class="small" style="color:#5f5e5a">{{ m.body[:64] }}{% if m.body|length>64 %}…{% endif %}</div>
+          </a>
+        {% else %}
+          <p class="text-muted small text-center py-3 mb-0">No messages yet.<br>Reach out to us anytime.</p>
+        {% endfor %}
+      </div>
+      <div class="p-2 border-top">
+        <form method="post" action="{{ url_for('portal.messages') }}" class="d-flex gap-1">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input class="form-control form-control-sm" name="body" placeholder="Quick message…" autocomplete="off" required>
+          <button class="btn btn-sm btn-primary"><i class="bi bi-send"></i></button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="rf-card p-3 mb-3">
+  <h2 class="h6"><i class="bi bi-cart-check text-rf-orange"></i> Current orders</h2>
+  <div class="table-responsive">
+  <table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Number</th><th>Date</th><th class="text-end">Total</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for o in current %}
+      <tr>
+        <td><a href="{{ url_for('portal.order', order_id=o.id) }}" class="fw-semibold">{{ o.number }}</a></td>
+        <td class="small">{{ o.order_date }}</td>
+        <td class="text-end money">{{ o.total|money(o.currency) }}</td>
+        <td>
+          {% if o.status=='submitted' %}<span class="badge" style="background:#ED1C24">submitted</span>
+          {% elif o.status=='placed' %}<span class="badge bg-dark">confirmed</span>
+          {% elif o.status=='in_fulfillment' %}<span class="badge" style="background:#F47A21">being prepared</span>
+          {% elif o.status=='ready_for_dispatch' %}<span class="badge" style="background:#6E7149">ready for dispatch</span>
+          {% elif o.status in ['out_for_delivery','dispatched'] %}<span class="badge" style="background:#2E7D32">on the way</span>
+          {% elif o.status=='pending' %}<span class="badge badge-warn">pending stock</span>{% endif %}
+        </td>
+      </tr>
+    {% else %}<tr><td colspan="4" class="text-muted text-center py-3">No current orders.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{% if drafts %}
+<div class="alert alert-warning py-2">You have an unfinished order:
+  {% for d in drafts %}<a href="{{ url_for('portal.order', order_id=d.id) }}">{{ d.number }}</a>{% if not loop.last %}, {% endif %}{% endfor %} — finish and submit it.</div>
+{% endif %}
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="rf-card p-3 h-100">
+      <h2 class="h6">Your pricelist</h2>
+      {% for p in lists %}
+      <a class="d-block" href="{{ url_for('portal.pricelist', list_id=p.id) }}"><i class="bi bi-card-list"></i> {{ p.name }} ({{ p.currency }})</a>
+      {% else %}<p class="text-muted mb-0">No pricelist assigned yet. Please contact us.</p>{% endfor %}
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="rf-card p-3 h-100">
+      <h2 class="h6"><i class="bi bi-receipt text-rf-orange"></i> Your quotes</h2>
+      <ul class="list-group list-group-flush">
+        {% for o in offers %}
+        <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+          <a href="{{ url_for('portal.offer', offer_id=o.id) }}">{{ o.number }}</a>
+          <span>
+            {% if o.status=='converted' %}<span class="badge badge-ok">accepted</span>{% else %}<span class="badge bg-dark">quote</span>{% endif %}
+            <span class="money ms-2">{{ o.total|money(o.currency) }}</span>
+            {% if o.status=='issued' %}<a class="btn btn-sm btn-primary ms-2 py-0" href="{{ url_for('portal.offer', offer_id=o.id) }}">View &amp; accept</a>{% endif %}
+          </span>
+        </li>
+        {% else %}<li class="list-group-item px-0 text-muted">No quotes right now.</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+  <div class="col-12">
+    <div class="rf-card p-3">
+      <h2 class="h6">Past orders</h2>
+      <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Number</th><th>Date</th><th>Status</th><th class="text-end">Total</th><th></th></tr></thead>
+        <tbody>
+        {% for o in past %}
+          <tr>
+            <td><a href="{{ url_for('portal.order', order_id=o.id) }}">{{ o.number }}</a></td>
+            <td class="small">{{ o.order_date }}</td>
+            <td>{% if o.status in ['delivered','fulfilled'] %}<span class="badge badge-ok">delivered</span>{% elif o.status=='cancelled' %}<span class="badge bg-secondary">cancelled</span>{% else %}<span class="badge bg-dark">{{ o.status.replace('_',' ') }}</span>{% endif %}</td>
+            <td class="text-end money">{{ o.total|money(o.currency) }}</td>
+            <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('portal.order_pdf', order_id=o.id) }}"><i class="bi bi-file-earmark-pdf"></i></a></td>
+          </tr>
+        {% else %}<tr><td colspan="5" class="text-muted text-center py-3">No past orders yet.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

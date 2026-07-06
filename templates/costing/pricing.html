@@ -1,0 +1,32 @@
+{% extends "costing/_shell.html" %}
+{% block heading %}Pricing{% endblock %}
+{% block costing_content %}
+<div class="page-head">
+  <h1>Pricing Calculator</h1>
+  <div class="spacer"></div>
+  <span class="text-muted small">Wholesale margin {{ wm|round|int }}% · RRP markup {{ rm|round|int }}% · VAT {{ vat|round|int }}%</span>
+</div>
+<div class="card"><div class="card-body">
+  <table class="table table-hover align-middle">
+    <thead><tr>
+      <th>Product</th><th class="num">Cost/kg</th>
+      <th class="num">Wholesale Excl</th><th class="num">Wholesale Incl</th>
+      <th class="num">RRP Excl</th><th class="num">RRP Incl</th><th class="num">Margin %</th><th></th>
+    </tr></thead>
+    <tbody>
+      {% for r, cost, p in rows %}
+      <tr>
+        <td class="fw-semibold">{{ r.name }}</td>
+        <td class="num">{{ cost|money }}</td>
+        <td class="num">{{ p.wholesale_excl|money }}</td>
+        <td class="num">{{ p.wholesale_incl|money }}</td>
+        <td class="num">{{ p.rrp_excl|money }}</td>
+        <td class="num">{{ p.rrp_incl|money }}</td>
+        <td class="num">{{ '%.0f'|format(p.margin_pct) }}%</td>
+        <td><a class="btn btn-sm btn-outline-secondary py-0" href="{{ url_for('pricing.detail', rid=r.id) }}">Pack sizes</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+{% endblock %}

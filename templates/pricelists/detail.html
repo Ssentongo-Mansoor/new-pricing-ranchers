@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block heading %}{{ pl.name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start mb-3 gap-2">
+  <div>
+    <span class="badge bg-secondary">{{ pl.currency }}</span>
+    {% if pl.is_zero_rated %}<span class="badge badge-ok">Zero-rated (no VAT)</span>
+    {% else %}<span class="badge bg-dark">VAT {{ pl.vat_rate|int }}%</span>{% endif %}
+    {% if pl.price_basis == 'kg' %}<span class="badge" style="background:#6E7149" title="Wholesale/HORECA prices are per kilogram">prices per kg</span>{% endif %}
+    {% if current_user.is_pricing_officer or current_user.is_admin %}
+    <form method="post" action="{{ url_for('pricelists.set_vat', list_id=pl.id) }}" class="d-inline-flex align-items-center gap-1 ms-2">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="vat_applicable" value="{{ '0' if pl.vat_applicable else '1' }}">
+      <input type="hidden" name="vat_rate" value="{{ pl.vat_rate }}">
+      <button class="btn btn-sm btn-outline-secondary py-0"><i class="bi bi-toggle-{{ 'on' if pl.vat_applicable else 'off' }}"></i> {{ 'Switch VAT off' if pl.vat_applicable else 'Charge VAT' }}</button>
+    </form>
+    {% endif %}
+    {% set st = pl.status_for() %}
+    {% if st=='expired' %}<span class="badge badge-danger">Expired {{ pl.valid_until }}</span>
+    {% elif st=='expiring' %}<span class="badge badge-warn">Expiring {{ pl.valid_until }}</span>
+    {% elif st=='valid' %}<span class="badge badge-ok">Valid to {{ pl.valid_until }}</span>{% endif %}
+    <div class="small text-muted mt-1">Effective {{ pl.effective_date }}{% if pl.source_file %} · source: {{ pl.source_file }}{% endif %}</div>
+    {% if current_user.can_manage_all %}
+    <form method="post" action="{{ url_for('pricelists.set_group', list_id=pl.id) }}" class="d-flex align-items-center gap-2 mt-2">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="small text-muted mb-0">Group:</label>
+      <input class="form-control form-control-sm" name="group_name" list="grouplist" style="max-width:260px"
+             value="{{ pl.group_name or '' }}" placeholder="(auto from name)">
+      <datalist id="grouplist">
+        <option>Business to Business</option><option>Business to Distributor</option>
+        <option>Betar</option><option>Ranchers Finest Meat Supermarkets</option>
+        <option>Export</option><option>Other</option>
+      </datalist>
+      <button class="btn btn-sm btn-outline-secondary">Set group</button>
+    </form>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if current_user.can_manage_all %}
+    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('pricelists.duplicate', list_id=pl.id) }}"><i class="bi bi-files"></i> Duplicate for new period</a>
+    {% endif %}
+    {% if can_edit %}
+    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('pricelists.bulk', list_id=pl.id) }}"><i class="bi bi-percent"></i> Bulk adjust</a>
+    {% endif %}
+    {% if current_user.can_manage_all or current_user.may_edit_prices %}
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('pricelists.history', list_id=pl.id) }}"><i class="bi bi-clock-history"></i> Price history</a>
+    {% endif %}
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('pricelists.export_generic', list_id=pl.id, fmt='xlsx') }}"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('pricelists.export_generic', list_id=pl.id, fmt='pdf', view=1) }}" target="_blank"><i class="bi bi-eye"></i> View</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('pricelists.export_generic', list_id=pl.id, fmt='pdf') }}"><i class="bi bi-download"></i> PDF</a>
+    {% if current_user.can_manage_all %}
+      {% if pl.archived %}
+      <form method="post" action="{{ url_for('pricelists.unarchive', list_id=pl.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-counterclockwise"></i> Restore</button></form>
+      {% else %}
+      <form method="post" action="{{ url_for('pricelists.archive', list_id=pl.id) }}" onsubmit="return confirm('Archive this pricelist?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-secondary"><i class="bi bi-archive"></i> Archive</button></form>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+{% if can_edit or current_user.can_manage_all %}
+<form class="row g-2 mb-3" method="post" action="{{ url_for('pricelists.add_product_line', list_id=pl.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="col-auto"><input class="form-control form-control-sm" name="article_no" placeholder="Add product by article no" required></div>
+  <div class="col-auto"><button class="btn btn-sm btn-outline-primary"><i class="bi bi-plus-lg"></i> Add product</button></div>
+  <div class="col-auto"><a class="btn btn-sm btn-link" href="{{ url_for('products.new') }}">or create a new product</a></div>
+</form>
+{% endif %}
+
+<form class="row g-2 mb-3" method="get">
+  <div class="col-md-4"><input class="form-control" name="q" value="{{ q }}" placeholder="Search article no, description or barcode"></div>
+  <div class="col-md-3">
+    <select class="form-select" name="category">
+      <option value="">All categories</option>
+      {% for c in categories %}<option value="{{ c }}" {{ 'selected' if c==cat }}>{{ c }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2">
+    <select class="form-select" name="ccy">
+      <option value="{{ pl.currency }}" {{ 'selected' if display_ccy==pl.currency }}>{{ pl.currency }} (native)</option>
+      {% if pl.currency=='UGX' %}<option value="USD" {{ 'selected' if display_ccy=='USD' }}>Show in USD</option>{% endif %}
+      {% if pl.currency=='USD' %}<option value="UGX" {{ 'selected' if display_ccy=='UGX' }}>Show in UGX</option>{% endif %}
+    </select>
+  </div>
+  <div class="col-md-2 form-check d-flex align-items-center ms-2">
+    <input class="form-check-input me-2" type="checkbox" name="inactive" value="1" id="inact" {{ 'checked' if show_inactive }}>
+    <label class="form-check-label" for="inact">Show inactive</label>
+  </div>
+  <div class="col-md-1"><button class="btn btn-primary w-100">Filter</button></div>
+</form>
+
+{% if display_ccy != pl.currency %}
+<div class="alert alert-info py-2 small">Showing converted {{ display_ccy }} figures at the exchange rate in force. Native currency is {{ pl.currency }}.</div>
+{% endif %}
+
+{% include "partials/list_table.html" %}
+{% endblock %}
+{% block scripts %}{% include "partials/list_scripts.html" %}{% endblock %}

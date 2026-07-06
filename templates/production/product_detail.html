@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block heading %}Production — {{ row.product.description }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start flex-wrap mb-3">
+  <div>
+    <div class="fw-semibold">{{ row.product.description }} <span class="text-muted small">{{ row.product.article_no }}</span></div>
+    <div class="text-muted small">Pack {{ row.pack_size or '—' }} · Unit {{ row.uom or '—' }}</div>
+  </div>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('production.index') }}">Back to list</a>
+</div>
+
+<div class="rf-kpis" style="grid-template-columns:repeat(3,1fr)">
+  <div class="rf-kpi"><div class="num">{{ '%g'|format(row.demand) }}</div><div class="lbl">Open-order demand</div></div>
+  <div class="rf-kpi"><div class="num">{{ '%g'|format(row.on_hand) }}</div><div class="lbl">In stock</div></div>
+  <div class="rf-kpi"><div class="num" style="color:#B5341F">{{ '%g'|format(row.shortfall) }}</div><div class="lbl">Suggested to produce</div></div>
+</div>
+
+{% if can_record %}
+<form method="post" action="{{ url_for('production.produce', product_id=row.product.id) }}" class="d-flex gap-2 align-items-end my-3">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ url_for('production.product_detail', product_id=row.product.id) }}">
+  <div><label class="form-label small mb-1">Quantity produced ({{ row.uom }})</label>
+    <input type="number" step="any" min="0" name="qty" value="{{ '%g'|format(row.shortfall) }}" class="form-control" style="max-width:160px" required></div>
+  <div><label class="form-label small mb-1">Lot (blank = auto)</label>
+    <input type="text" name="lot_number" class="form-control" style="max-width:170px" placeholder="auto"></div>
+  <div><label class="form-label small mb-1">Expiry</label>
+    <input type="date" name="expiry" class="form-control" style="max-width:170px"></div>
+  <div class="flex-grow-1"><label class="form-label small mb-1">Note (optional)</label>
+    <input type="text" name="note" class="form-control"></div>
+  <button class="btn btn-primary" type="submit">Record production</button>
+</form>
+{% endif %}
+
+<h6 class="mt-4">Recipe</h6>
+{% if mapping %}
+  <p class="mb-2">Linked to <span class="fw-semibold">{{ mapping.recipe_name }}</span>
+    <span class="text-muted small">({{ mapping.match_method }})</span></p>
+  {% if explosion and not explosion.warning %}
+  <p class="text-muted small">To make {{ '%g'|format(explosion.kg_needed) }} kg ({{ explosion.basis }}), batch size {{ '%g'|format(explosion.batch_kg) }} kg, scale {{ '%.3f'|format(explosion.factor) }}.</p>
+  <div class="table-responsive">
+  <table class="table table-sm align-middle">
+    <thead><tr><th>Raw material</th><th class="text-end">Needed (kg)</th></tr></thead>
+    <tbody>
+    {% for c in explosion.components %}
+      <tr><td>{{ c.name }}</td><td class="text-end">{{ '%.3f'|format(c.kg) }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% elif explosion and explosion.warning %}
+    <div class="alert alert-warning">{{ explosion.warning }}</div>
+  {% endif %}
+  {% if can_map %}
+  <form method="post" action="{{ url_for('production.recipe_unmap') }}" class="d-inline"
+        onsubmit="return confirm('Remove the recipe link?')">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="product_id" value="{{ row.product.id }}">
+    <input type="hidden" name="next" value="{{ url_for('production.product_detail', product_id=row.product.id) }}">
+    <button class="btn btn-sm btn-outline-danger">Remove link</button>
+  </form>
+  {% endif %}
+{% else %}
+  <div class="alert alert-secondary">No recipe linked.{% if suggested %} Suggested: <span class="fw-semibold">{{ suggested.name }}</span>.{% endif %}</div>
+  {% if can_map %}
+  <form method="post" action="{{ url_for('production.recipe_map') }}" class="d-flex gap-2" style="max-width:560px">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="product_id" value="{{ row.product.id }}">
+    <input type="hidden" name="next" value="{{ url_for('production.product_detail', product_id=row.product.id) }}">
+    <select name="recipe_id" class="form-select form-select-sm">
+      {% for r in all_recipes %}<option value="{{ r.id }}" {{ 'selected' if suggested and suggested.id==r.id }}>{{ r.name }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-sm btn-primary">Link recipe</button>
+  </form>
+  {% endif %}
+{% endif %}
+
+<h6 class="mt-4">Demand from open orders</h6>
+<div class="table-responsive">
+<table class="table table-sm align-middle">
+  <thead><tr><th>Order</th><th>Customer</th><th>Delivery</th><th>Status</th><th class="text-end">Quantity</th></tr></thead>
+  <tbody>
+  {% for l in row.lines %}
+    {% set o = l.order %}
+    <tr>
+      <td><a href="{{ url_for('orders.detail', order_id=o.id) }}">{{ o.number or o.id }}</a></td>
+      <td>{{ o.customer.name if o.customer else '' }}</td>
+      <td class="small">{{ o.delivery_date.strftime('%d %b %Y') if o.delivery_date else '—' }}</td>
+      <td class="small">{{ o.status }}</td>
+      <td class="text-end">{{ '%g'|format(l.quantity or 0) }} <span class="text-muted small">{{ row.uom }}</span></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5" class="text-muted">No open orders need this product.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<h6 class="mt-4">Recent production</h6>
+<div class="table-responsive">
+<table class="table table-sm align-middle">
+  <thead><tr><th>When</th><th class="text-end">Quantity</th><th>Lot</th><th>Expiry</th><th>By</th><th>Note</th></tr></thead>
+  <tbody>
+  {% for h in history %}
+    <tr>
+      <td class="small">{{ h.created_at.strftime('%d %b %Y %H:%M') if h.created_at else '' }}</td>
+      <td class="text-end">{{ '%g'|format(h.qty) }} <span class="text-muted small">{{ row.uom }}</span></td>
+      <td class="small">{{ h.lot_number or '—' }}</td>
+      <td class="small">{{ h.expiry.strftime('%d %b %Y') if h.expiry else '—' }}</td>
+      <td class="small">{{ h.recorded_by.full_name if h.recorded_by else '' }}</td>
+      <td class="small text-muted">{{ h.note or '' }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6" class="text-muted">No production recorded yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

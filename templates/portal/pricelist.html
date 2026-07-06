@@ -1,0 +1,55 @@
+{% extends "portal/base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h5 rf-head mb-0">{{ pl.name }}</h1>
+  <div class="d-flex gap-2">
+    {% if lists|length > 1 %}
+    <select class="form-select form-select-sm" onchange="location.href=this.value">
+      {% for p in lists %}<option value="{{ url_for('portal.pricelist', list_id=p.id) }}" {{ 'selected' if p.id==pl.id }}>{{ p.name }}</option>{% endfor %}
+    </select>{% endif %}
+    <a class="btn btn-sm btn-primary" href="{{ url_for('portal.order_new') }}"><i class="bi bi-cart"></i> Order from this list</a>
+  </div>
+</div>
+<p class="text-muted small">Currency {{ pl.currency }} · {{ 'Zero-rated (export)' if pl.is_zero_rated else 'VAT '~(pl.vat_rate|int)~'%' }}{% if pl.valid_until %} · valid to {{ pl.valid_until }}{% endif %}</p>
+
+<div class="input-group mb-3" style="max-width:420px">
+  <span class="input-group-text"><i class="bi bi-search"></i></span>
+  <input class="form-control" id="plSearch" placeholder="Search product or article no…"
+         onkeyup="filterTable('plSearch','plTable')" autocomplete="off">
+</div>
+
+<div class="table-responsive rf-card">
+<table class="table table-sm table-hover align-middle mb-0" id="plTable">
+  <thead><tr><th>Art No</th><th>Description</th><th>Pack</th>{% for t in tiers %}<th class="text-end">{{ t.label }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% set ns = namespace(section=None) %}
+  {% for r in rows %}
+    {% if r.line.section and r.line.section != ns.section %}
+      {% set ns.section = r.line.section %}
+      <tr class="section-row"><td colspan="{{ 3 + tiers|length }}">{{ r.line.section }}</td></tr>
+    {% endif %}
+    <tr data-search="{{ (r.product.article_no ~ ' ' ~ r.product.description)|lower }}">
+      <td class="fw-semibold">{{ r.product.article_no }}</td>
+      <td>{{ r.product.description }}</td>
+      <td class="small">{{ r.line.pack_size or r.product.pack_size or '' }}</td>
+      {% for t in tiers %}{% set pr = r.priced[t.key] %}
+      <td class="text-end money">{% if pr.amount is not none %}{{ pr.amount|money(pr.currency) }}{% else %}—{% endif %}</td>
+      {% endfor %}
+    </tr>
+  {% else %}<tr><td colspan="20" class="text-center text-muted py-4">No items.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function filterTable(inputId, tableId){
+  var term=(document.getElementById(inputId).value||'').toLowerCase();
+  document.querySelectorAll('#'+tableId+' tbody tr').forEach(function(tr){
+    if(tr.classList.contains('section-row')){ tr.style.display = term ? 'none' : ''; return; }
+    var s=tr.getAttribute('data-search')||'';
+    tr.style.display = (!term || s.indexOf(term)>-1) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

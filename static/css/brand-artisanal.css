@@ -1,0 +1,190 @@
+/* ==========================================================================
+   Ranchers Finest — ARTISANAL LIFESTYLE THEME
+   Loaded AFTER brand.css + app.css; overrides tokens, type and components.
+   Aesthetic: warm cream paper, editorial retro display serif (Fraunces),
+   razor-sharp geometric sans (Space Grotesk), black->orange fade accent.
+   Fonts bundled locally under static/fonts. No external CDN.
+   ========================================================================== */
+
+/* ---- Editorial display serif (headers, product titles) ---- */
+@font-face { font-family:"RF Display"; src:url("../fonts/fraunces-latin-900-normal.woff2") format("woff2"); font-weight:900; font-style:normal; font-display:swap; }
+@font-face { font-family:"RF Display"; src:url("../fonts/fraunces-latin-700-normal.woff2") format("woff2"); font-weight:700; font-style:normal; font-display:swap; }
+@font-face { font-family:"RF Display"; src:url("../fonts/fraunces-latin-600-normal.woff2") format("woff2"); font-weight:600; font-style:normal; font-display:swap; }
+@font-face { font-family:"RF Display"; src:url("../fonts/fraunces-latin-500-italic.woff2") format("woff2"); font-weight:500; font-style:italic; font-display:swap; }
+@font-face { font-family:"RF Display"; src:url("../fonts/fraunces-latin-400-italic.woff2") format("woff2"); font-weight:400; font-style:italic; font-display:swap; }
+
+/* ---- Geometric sans (data, prices, UI) ---- */
+@font-face { font-family:"RF Sans"; src:url("../fonts/space-grotesk-latin-400-normal.woff2") format("woff2"); font-weight:400; font-style:normal; font-display:swap; }
+@font-face { font-family:"RF Sans"; src:url("../fonts/space-grotesk-latin-500-normal.woff2") format("woff2"); font-weight:500; font-style:normal; font-display:swap; }
+@font-face { font-family:"RF Sans"; src:url("../fonts/space-grotesk-latin-600-normal.woff2") format("woff2"); font-weight:600; font-style:normal; font-display:swap; }
+@font-face { font-family:"RF Sans"; src:url("../fonts/space-grotesk-latin-700-normal.woff2") format("woff2"); font-weight:700; font-style:normal; font-display:swap; }
+
+:root {
+  /* Warm paper palette */
+  --rf-cream:     #F7F0E2;   /* main background — warm cream paper */
+  --rf-paper:     #FCF8F0;   /* card surface — soft off-white */
+  --rf-sand:      #EFE4D2;   /* subtle panels */
+  --rf-ink:       #15110D;   /* warm near-black */
+  --rf-charcoal:  #2A231C;
+  --rf-muted:     #7C6F5E;   /* warm muted text */
+  --rf-border:    #E4D7C2;   /* warm hairline */
+
+  /* Organic accents */
+  --rf-orange:    #E2701A;   /* deepened, organic burnt-orange */
+  --rf-amber:     #E9A23B;
+  --rf-red:       #B5341F;   /* brick red, secondary */
+  --rf-olive:     #6E7149;   /* heritage tag accent */
+
+  /* Signature black -> orange fade */
+  --rf-gradient:  linear-gradient(120deg, #15110D 0%, #4A2C12 46%, #E2701A 100%);
+
+  --rf-ok:     #5C7A33;
+  --rf-warn:   #E9A23B;
+  --rf-danger: #B5341F;
+
+  /* Bootstrap overrides */
+  --bs-primary:       #E2701A;
+  --bs-primary-rgb:   226, 112, 26;
+  --bs-body-bg:       #F7F0E2;
+  --bs-body-color:    #2A231C;
+  --bs-link-color:    #B5341F;
+  --bs-link-hover-color: #8f2716;
+  --bs-font-sans-serif: "RF Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --bs-border-color: #E4D7C2;
+}
+
+/* ---- Base type ---- */
+body {
+  font-family:"RF Sans", system-ui, sans-serif;
+  background:
+    radial-gradient(1200px 500px at 100% -10%, rgba(226,112,26,.06), transparent 60%),
+    var(--rf-cream);
+  color: var(--rf-charcoal);
+  letter-spacing:.005em;
+}
+h1,h2,h3,h4,h5,h6,.rf-head {
+  font-family:"RF Display", Georgia, serif;
+  font-weight:900;
+  color: var(--rf-ink);
+  letter-spacing:-.01em;
+  line-height:1.08;
+}
+.h6, h6 { font-weight:700; letter-spacing:0; }
+
+/* Editorial eyebrow / section label helper */
+.rf-eyebrow {
+  font-family:"RF Sans", sans-serif; font-weight:600;
+  text-transform:uppercase; letter-spacing:.22em; font-size:.7rem;
+  color: var(--rf-orange);
+}
+.money, .price-cell { font-family:"RF Sans", sans-serif; font-variant-numeric: tabular-nums; }
+
+/* ---- Sidebar / topbar ---- */
+.rf-sidebar, .rf-topbar { background: var(--rf-ink); color:#F7F0E2; }
+.rf-sidebar .nav-link { color:#e9dcc7; letter-spacing:.01em; }
+.rf-sidebar .nav-link:hover { background:#241c14; color:#fff; }
+.rf-sidebar .nav-link.active { background: var(--rf-orange); color:#fff; box-shadow:0 6px 16px rgba(226,112,26,.35); }
+.rf-topbar { background: var(--rf-paper); color: var(--rf-ink); border-bottom:1px solid var(--rf-border); border-image:none; }
+.rf-topbar .rf-user { color: var(--rf-muted); }
+
+/* ---- Cards & panels ---- */
+.rf-card {
+  background: var(--rf-paper);
+  border:1px solid var(--rf-border);
+  border-radius:16px;
+  box-shadow:0 10px 30px rgba(21,17,13,.06);
+}
+.rf-stat, .rf-kpi { background: var(--rf-paper); border:1px solid var(--rf-border); border-radius:16px; }
+.rf-kpi { box-shadow:0 10px 26px rgba(21,17,13,.07); }
+.rf-kpi:hover { box-shadow:0 16px 32px rgba(226,112,26,.18); }
+.rf-kpi .num, .rf-stat .num { font-family:"RF Display", serif; font-weight:900; color: var(--rf-orange); }
+.rf-kpi .lbl, .rf-stat .lbl { font-family:"RF Sans", sans-serif; color: var(--rf-muted); letter-spacing:.14em; }
+
+/* ---- Hero band ---- */
+.rf-hero { background: var(--rf-gradient); border-radius:20px; padding:26px 28px; }
+.rf-hero h1 { font-family:"RF Display", serif; font-weight:900; font-size:2rem; color:#fff; }
+.rf-hero .sub { color:#f4d7b8; font-family:"RF Sans", sans-serif; letter-spacing:.02em; }
+
+/* ---- Buttons: editorial pill CTAs ---- */
+.btn { border-radius:10px; font-family:"RF Sans", sans-serif; font-weight:600; }
+.btn-primary {
+  --bs-btn-bg: var(--rf-orange); --bs-btn-border-color: var(--rf-orange);
+  --bs-btn-hover-bg:#c75f12; --bs-btn-hover-border-color:#c75f12;
+  --bs-btn-active-bg:#ad5310; --bs-btn-color:#fff; --bs-btn-hover-color:#fff;
+  letter-spacing:.04em;
+}
+.btn-lg.btn-primary, .rf-cta {
+  background: var(--rf-gradient); border:none; color:#fff;
+  border-radius:999px; padding:.7rem 1.6rem; letter-spacing:.06em;
+  text-transform:uppercase; font-size:.82rem; font-weight:700;
+  box-shadow:0 10px 24px rgba(226,112,26,.30);
+}
+.rf-cta:hover { color:#fff; filter:brightness(1.05); }
+.btn-outline-primary { --bs-btn-color:#c75f12; --bs-btn-border-color:var(--rf-orange); --bs-btn-hover-bg:var(--rf-orange); --bs-btn-hover-border-color:var(--rf-orange); }
+
+/* ---- Tables ---- */
+.table thead th { background: var(--rf-ink); color:#F7F0E2; font-family:"RF Sans", sans-serif; font-weight:600; letter-spacing:.04em; text-transform:uppercase; font-size:.74rem; }
+.table-accent thead th { background: var(--rf-orange); }
+.section-row td { background: var(--rf-olive); color:#fff; font-family:"RF Display", serif; font-weight:700; letter-spacing:.01em; }
+.price-cell.editable:hover { background:#fbeede; outline:1px dashed var(--rf-orange); }
+
+/* ---- Nav pills / badges ---- */
+.nav-link.active, .nav-pills .nav-link.active { background: var(--rf-orange); color:#fff; }
+.badge-ok{background:var(--rf-ok);color:#fff;} .badge-warn{background:var(--rf-warn);color:var(--rf-ink);} .badge-danger{background:var(--rf-danger);color:#fff;}
+
+/* ---- Login: warm editorial ---- */
+.rf-login-wrap { background: var(--rf-gradient) !important; }
+.rf-login-card { border-radius:20px; box-shadow:0 24px 60px rgba(21,17,13,.5); }
+.rf-login-body { background: linear-gradient(180deg,#F3C896 0%, #F7E6CC 18%, var(--rf-paper) 52%, #fff 100%) !important; }
+.rf-login-banner h1, .rf-login-card h1 { font-family:"RF Display", serif; }
+
+/* ---- Customer portal: warm paper, not dark ---- */
+.portal-page { background: linear-gradient(160deg,#15110D 0%, #3A2412 30%, #E2701A 120%) !important; background-attachment:fixed; }
+.portal-page .rf-content > h1 { color:#fff; font-family:"RF Display", serif; }
+.portal-page .rf-content > p { color:#f4d7b8; }
+
+/* ---- Chat bubbles ---- */
+.bubble.them { background:#efe4d2; color:var(--rf-charcoal); }
+.bubble.me { background: var(--rf-orange); color:#fff; }
+.text-rf-orange { color: var(--rf-orange) !important; }
+
+/* ==========================================================================
+   Story-driven product cards (showcase + provenance-aware portal cards)
+   ========================================================================== */
+.rf-menu { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px,1fr)); gap:22px; }
+.rf-prod {
+  background: var(--rf-paper); border:1px solid var(--rf-border); border-radius:18px;
+  overflow:hidden; display:flex; flex-direction:column;
+  box-shadow:0 12px 30px rgba(21,17,13,.08); transition:transform .15s, box-shadow .15s;
+}
+.rf-prod:hover { transform:translateY(-3px); box-shadow:0 20px 40px rgba(21,17,13,.14); }
+.rf-prod .ph { position:relative; aspect-ratio:4/3; overflow:hidden; background:#e9ddc8; }
+.rf-prod .ph img { width:100%; height:100%; object-fit:cover; display:block; transition:transform .4s ease; }
+.rf-prod:hover .ph img { transform:scale(1.04); }
+.rf-prod .ph .tag {
+  position:absolute; top:12px; left:12px; background:rgba(21,17,13,.82); color:#fff;
+  font-family:"RF Sans", sans-serif; font-size:.64rem; letter-spacing:.16em; text-transform:uppercase;
+  padding:5px 10px; border-radius:999px;
+}
+.rf-prod .ph .tag.olive { background: var(--rf-olive); }
+.rf-prod .body { padding:18px 18px 20px; display:flex; flex-direction:column; gap:8px; flex:1; }
+.rf-prod .eyebrow { font-family:"RF Sans", sans-serif; font-weight:600; text-transform:uppercase; letter-spacing:.2em; font-size:.66rem; color:var(--rf-orange); }
+.rf-prod h3 { font-family:"RF Display", serif; font-weight:900; font-size:1.4rem; margin:0; color:var(--rf-ink); }
+.rf-prod .story { font-family:"RF Sans", sans-serif; font-size:.9rem; line-height:1.5; color:var(--rf-charcoal); }
+.rf-prod .prov {
+  font-family:"RF Display", serif; font-style:italic; font-weight:500; font-size:.92rem; color:var(--rf-muted);
+  border-left:3px solid var(--rf-amber); padding-left:10px; margin:2px 0;
+}
+.rf-prod .meta { display:flex; flex-wrap:wrap; gap:6px; margin-top:2px; }
+.rf-prod .meta .chip { font-family:"RF Sans", sans-serif; font-size:.68rem; letter-spacing:.06em; background:var(--rf-sand); color:var(--rf-charcoal); border-radius:999px; padding:4px 10px; }
+.rf-prod .foot { margin-top:auto; display:flex; align-items:flex-end; justify-content:space-between; gap:12px; padding-top:10px; border-top:1px dashed var(--rf-border); }
+.rf-prod .price { font-family:"RF Sans", sans-serif; }
+.rf-prod .price .amt { font-weight:700; font-size:1.25rem; color:var(--rf-ink); }
+.rf-prod .price .unit { display:block; font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:var(--rf-muted); }
+
+/* Editorial page intro used on the showcase */
+.rf-editorial-intro { max-width:680px; }
+.rf-editorial-intro .kicker { font-family:"RF Sans"; letter-spacing:.26em; text-transform:uppercase; font-size:.72rem; color:var(--rf-orange); }
+.rf-editorial-intro h1 { font-family:"RF Display", serif; font-weight:900; font-size:2.6rem; margin:.2rem 0 .4rem; }
+.rf-editorial-intro p { color:var(--rf-muted); font-size:1.02rem; line-height:1.6; }
+.rf-rule { height:1px; background:var(--rf-border); border:0; margin:26px 0; }

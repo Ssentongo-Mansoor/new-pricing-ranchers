@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block heading %}Production — stock vs demand{% endblock %}
+{% block content %}
+<p class="text-muted">Per product: what is on hand, what open orders demand, and the shortfall to produce. Short items first.</p>
+<div class="mb-3"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('production.index') }}"><i class="bi bi-hammer"></i> To produce</a></div>
+<div class="table-responsive">
+<table class="table table-hover align-middle">
+  <thead><tr>
+    <th>Product</th><th>Pack</th>
+    <th class="text-end">In stock</th><th class="text-end">Demand</th><th class="text-end">Shortfall</th>
+  </tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td><a href="{{ url_for('production.product_detail', product_id=r.product.id) }}">{{ r.product.description }}</a>
+          <div class="text-muted small">{{ r.product.article_no }}</div></td>
+      <td class="small text-muted">{{ r.pack_size }}</td>
+      <td class="text-end">{{ '%g'|format(r.on_hand) }} <span class="text-muted small">{{ r.uom }}</span></td>
+      <td class="text-end">{{ '%g'|format(r.demand) }}</td>
+      <td class="text-end {{ 'fw-semibold text-danger' if r.shortfall > 0 }}">{{ '%g'|format(r.shortfall) }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

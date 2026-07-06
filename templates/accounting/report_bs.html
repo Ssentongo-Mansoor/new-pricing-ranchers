@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block heading %}Balance sheet{% endblock %}
+{% block content %}
+{% include "accounting/_tb_badge.html" %}
+<form class="d-flex gap-2 mb-3 align-items-end" method="get">
+  <div><label class="form-label small">As of</label>
+    <input class="form-control form-control-sm" type="date" name="as_of" value="{{ as_of.isoformat() }}"></div>
+  <button class="btn btn-sm btn-primary">Run</button>
+</form>
+
+<div class="row">
+  <div class="col-md-6">
+    <div class="rf-card p-3 mb-3">
+      <h6>Assets</h6>
+      <table class="table table-sm mb-0"><tbody>
+        {% for a, v in r.sections.asset %}
+        <tr><td>{{ a.code }} · {{ a.name }}</td><td class="text-end">{{ '{:,}'.format(v) }}</td></tr>
+        {% endfor %}
+        <tr class="fw-semibold border-top"><td>Total assets</td><td class="text-end">{{ '{:,}'.format(r.totals.asset) }}</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="rf-card p-3 mb-3">
+      <h6>Liabilities</h6>
+      <table class="table table-sm mb-0"><tbody>
+        {% for a, v in r.sections.liability %}
+        <tr><td>{{ a.code }} · {{ a.name }}</td><td class="text-end">{{ '{:,}'.format(v) }}</td></tr>
+        {% endfor %}
+        <tr class="fw-semibold border-top"><td>Total liabilities</td><td class="text-end">{{ '{:,}'.format(r.totals.liability) }}</td></tr>
+      </tbody></table>
+    </div>
+    <div class="rf-card p-3 mb-3">
+      <h6>Equity</h6>
+      <table class="table table-sm mb-0"><tbody>
+        {% for a, v in r.sections.equity %}
+        <tr><td>{{ a.code }} · {{ a.name }}</td><td class="text-end">{{ '{:,}'.format(v) }}</td></tr>
+        {% endfor %}
+        <tr><td>Result to date (P&amp;L)</td><td class="text-end">{{ '{:,}'.format(r.result) }}</td></tr>
+        <tr class="fw-semibold border-top"><td>Liabilities + equity</td><td class="text-end">{{ '{:,}'.format(r.liab_equity_total) }}</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+</div>
+<p class="small">
+{% if r.check == 0 %}<span class="badge badge-ok">Assets = liabilities + equity ✓</span>
+{% else %}<span class="badge badge-danger">SHEET OUT OF BALANCE by {{ '{:,}'.format(r.check) }}</span>{% endif %}
+<span class="text-muted ms-2">UGX, as of {{ as_of.strftime('%d %b %Y') }}, posted entries only.</span>
+</p>
+<a class="btn btn-link px-0" href="{{ url_for('accounting.fin_reports') }}">&larr; All reports</a>
+{% endblock %}

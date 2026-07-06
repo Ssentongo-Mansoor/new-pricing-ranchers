@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 500" role="img" aria-label="Ranchers Finest">
+<g fill="#ffffff" stroke="none">
+<circle cx="360" cy="250" r="236" fill="none" stroke="#ffffff" stroke-width="5"/>
+<circle cx="360" cy="250" r="220" fill="none" stroke="#ffffff" stroke-width="13"/>
+<rect x="150" y="171" width="420" height="15" rx="7"/>
+<rect x="150" y="314" width="420" height="15" rx="7"/>
+<polygon points="230.8,168.0 239.2,168.0 235.0,142.0"/>
+<polygon points="248.7,168.0 257.1,168.0 252.9,130.1"/>
+<polygon points="266.5,168.0 274.9,168.0 270.7,113.6"/>
+<polygon points="284.4,168.0 292.8,168.0 288.6,96.5"/>
+<polygon points="302.2,168.0 310.6,168.0 306.4,81.0"/>
+<polygon points="320.1,168.0 328.5,168.0 324.3,68.6"/>
+<polygon points="337.9,168.0 346.3,168.0 342.1,60.7"/>
+<polygon points="355.8,168.0 364.2,168.0 360.0,58.0"/>
+<polygon points="373.7,168.0 382.1,168.0 377.9,60.7"/>
+<polygon points="391.5,168.0 399.9,168.0 395.7,68.6"/>
+<polygon points="409.4,168.0 417.8,168.0 413.6,81.0"/>
+<polygon points="427.2,168.0 435.6,168.0 431.4,96.5"/>
+<polygon points="445.1,168.0 453.5,168.0 449.3,113.6"/>
+<polygon points="462.9,168.0 471.3,168.0 467.1,130.1"/>
+<polygon points="480.8,168.0 489.2,168.0 485.0,142.0"/>
+<polygon points="230.8,332.0 239.2,332.0 235.0,358.0"/>
+<polygon points="248.7,332.0 257.1,332.0 252.9,369.9"/>
+<polygon points="266.5,332.0 274.9,332.0 270.7,386.4"/>
+<polygon points="284.4,332.0 292.8,332.0 288.6,403.5"/>
+<polygon points="302.2,332.0 310.6,332.0 306.4,419.0"/>
+<polygon points="320.1,332.0 328.5,332.0 324.3,431.4"/>
+<polygon points="337.9,332.0 346.3,332.0 342.1,439.3"/>
+<polygon points="355.8,332.0 364.2,332.0 360.0,442.0"/>
+<polygon points="373.7,332.0 382.1,332.0 377.9,439.3"/>
+<polygon points="391.5,332.0 399.9,332.0 395.7,431.4"/>
+<polygon points="409.4,332.0 417.8,332.0 413.6,419.0"/>
+<polygon points="427.2,332.0 435.6,332.0 431.4,403.5"/>
+<polygon points="445.1,332.0 453.5,332.0 449.3,386.4"/>
+<polygon points="462.9,332.0 471.3,332.0 467.1,369.9"/>
+<polygon points="480.8,332.0 489.2,332.0 485.0,358.0"/>
+</g>
+<text x="360" y="252" text-anchor="middle" fill="#ffffff" font-family="Georgia, 'Times New Roman', serif" font-weight="700" font-size="92" letter-spacing="1">RANCHERS</text>
+<text x="360" y="312" text-anchor="middle" fill="#ffffff" font-family="Georgia, 'Times New Roman', serif" font-weight="700" font-size="68" letter-spacing="10">FINEST</text>
+</svg>

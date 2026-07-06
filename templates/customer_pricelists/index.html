@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block heading %}Pricelists{% endblock %}
+{% block content %}
+{% include "partials/pricelist_tabs.html" %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <p class="text-muted mb-0">
+    {% if show_archived %}Archived customer pricelists — kept as records.
+    {% else %}Tailor-made lists per customer.{% if not (current_user.sees_all_customers or current_user.can_manage_all) %} You see only the customers assigned to you.{% endif %}{% endif %}
+  </p>
+  <div class="d-flex gap-2">
+    {% if show_archived %}
+      <a class="btn btn-outline-secondary" href="{{ url_for('customer_pricelists.index') }}"><i class="bi bi-arrow-left"></i> Active</a>
+    {% else %}
+      <a class="btn btn-outline-secondary" href="{{ url_for('customer_pricelists.index', archived=1) }}"><i class="bi bi-archive"></i> Archived{% if n_archived %} ({{ n_archived }}){% endif %}</a>
+      {% if has_perm(current_user, 'manage_catalogue') %}
+      <a class="btn btn-primary" href="{{ url_for('customer_pricelists.new') }}"><i class="bi bi-plus-lg"></i> New customer pricelist</a>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+<div class="table-responsive rf-card">
+<table class="table table-hover align-middle mb-0">
+  <thead><tr><th>Name</th><th>Customer</th><th>Base list</th><th>Currency</th><th>Validity</th><th></th></tr></thead>
+  <tbody>
+  {% for p in lists %}
+    <tr>
+      <td><a href="{{ url_for('customer_pricelists.detail', list_id=p.id) }}" class="fw-semibold">{{ p.name }}</a></td>
+      <td>{{ p.customer.name if p.customer else '—' }}</td>
+      <td class="small">{{ p.base_pricelist.name if p.base_pricelist else p.source_file }}</td>
+      <td>{{ p.currency }}</td>
+      <td>
+        {% set st = p.status_for() %}
+        {% if st=='expired' %}<span class="badge badge-danger">expired {{ p.valid_until }}</span>
+        {% elif st=='expiring' %}<span class="badge badge-warn">expiring {{ p.valid_until }}</span>
+        {% elif st=='valid' %}<span class="badge badge-ok">valid to {{ p.valid_until }}</span>
+        {% else %}<span class="badge bg-secondary">open</span>{% endif %}
+      </td>
+      <td class="text-end text-nowrap">
+        <a class="btn btn-sm btn-outline-secondary" title="Excel" href="{{ url_for('pricelists.export_customer', list_id=p.id, fmt='xlsx') }}"><i class="bi bi-file-earmark-excel"></i></a>
+        <a class="btn btn-sm btn-outline-secondary" title="PDF" href="{{ url_for('pricelists.export_customer', list_id=p.id, fmt='pdf') }}"><i class="bi bi-file-earmark-pdf"></i></a>
+        {% if has_perm(current_user, 'manage_catalogue') %}
+          {% if p.archived %}
+          <form method="post" action="{{ url_for('pricelists.unarchive', list_id=p.id) }}" class="d-inline">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-secondary" title="Restore"><i class="bi bi-arrow-counterclockwise"></i></button></form>
+          {% else %}
+          <form method="post" action="{{ url_for('pricelists.archive', list_id=p.id) }}" class="d-inline"
+                onsubmit="return confirm('Archive “{{ p.name }}”?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-secondary" title="Archive"><i class="bi bi-archive"></i></button></form>
+          {% endif %}
+          <form method="post" action="{{ url_for('customer_pricelists.delete', list_id=p.id) }}" class="d-inline"
+                onsubmit="return confirm('Permanently DELETE “{{ p.name }}”? This removes it from every customer it is linked to and cannot be undone.')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-danger" title="Delete permanently"><i class="bi bi-trash"></i></button></form>
+        {% endif %}
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6" class="text-center text-muted py-4">{% if show_archived %}No archived customer pricelists.{% else %}No customer pricelists visible to you.{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

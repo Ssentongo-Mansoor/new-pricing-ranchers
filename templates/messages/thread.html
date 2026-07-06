@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block heading %}Messages · {{ customer.name }}{% endblock %}
+{% block content %}
+<a href="{{ url_for('messages.index') }}" class="small">&larr; All conversations</a>
+<div class="rf-card p-3 mt-2" style="max-width:760px">
+  <div class="chat mb-3" style="max-height:55vh; overflow:auto">
+    {% for m in msgs %}
+      <div class="bubble {{ 'me' if m.sender_type=='staff' else 'them' }}">
+        {{ m.body }}
+        <div class="meta">{{ (m.sender_name or 'Staff') if m.sender_type=='staff' else customer.name }} · {{ m.created_at.strftime('%d %b %H:%M') }}</div>
+      </div>
+    {% else %}
+      <p class="text-muted text-center py-3">No messages yet. Send the first one below.</p>
+    {% endfor %}
+  </div>
+  <form method="post" class="d-flex gap-2">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input class="form-control" name="body" placeholder="Reply to {{ customer.name }}…" autocomplete="off" required>
+    <button class="btn btn-primary"><i class="bi bi-send"></i></button>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}<script>var c=document.querySelector('.chat'); if(c) c.scrollTop=c.scrollHeight;</script>{% endblock %}

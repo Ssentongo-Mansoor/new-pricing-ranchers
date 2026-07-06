@@ -1,0 +1,55 @@
+{% extends "costing/_shell.html" %}
+{% block heading %}Recipes{% endblock %}
+{% block costing_content %}
+<div class="page-head">
+  <h1>Product Recipes</h1>
+  <div class="spacer"></div>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('recipes.inactive') }}"><i class="bi bi-archive"></i> Inactive</a>
+  {% if has_perm(current_user, 'edit_costing') %}<a class="btn btn-sm btn-rf" href="{{ url_for('recipes.new') }}"><i class="bi bi-plus-lg"></i> New Recipe</a>{% endif %}
+</div>
+<div class="card"><div class="card-body">
+  <form class="row g-2 align-items-center mb-3" method="get">
+    <div class="col-auto">
+      <select name="category" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">All categories</option>
+        {% for c in categories %}<option value="{{ c.id }}" {{ 'selected' if cat_id==c.id }}>{{ c.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-auto form-check">
+      <input class="form-check-input" type="checkbox" id="showAll" name="show" value="all" {{ 'checked' if show_all }} onchange="this.form.submit()">
+      <label class="form-check-label small" for="showAll">Show all (incl. inactive)</label>
+    </div>
+  </form>
+  <table class="table table-hover align-middle">
+    <thead><tr><th>Product</th><th>Category</th><th>Status</th><th class="num">Cost/kg</th><th></th></tr></thead>
+    <tbody>
+      {% for r, cost in rows %}
+      <tr class="{{ 'row-inactive' if r.status=='inactive' }}">
+        <td class="fw-semibold"><a href="{{ url_for('recipes.view', rid=r.id) }}" class="text-decoration-none">{{ r.name }}</a></td>
+        <td class="small text-muted">{{ r.category.name if r.category else '—' }}</td>
+        <td>{% if r.status=='inactive' %}<span class="badge bg-secondary">Inactive</span>{% else %}<span class="badge bg-success">Active</span>{% endif %}</td>
+        <td class="num text-rf fw-semibold">{{ cost|money }}</td>
+        <td class="text-nowrap">
+          <a class="btn btn-sm btn-outline-secondary py-0" href="{{ url_for('recipes.view', rid=r.id) }}"><i class="bi bi-eye"></i></a>
+          {% if has_perm(current_user, 'edit_costing') %}
+          <a class="btn btn-sm btn-outline-secondary py-0" href="{{ url_for('recipes.edit', rid=r.id) }}" title="Edit"><i class="bi bi-pencil"></i></a>
+          <form class="d-inline" method="post" action="{{ url_for('recipes.copy', rid=r.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-secondary py-0" title="Copy"><i class="bi bi-files"></i></button>
+          </form>
+          <form class="d-inline" method="post" action="{{ url_for('recipes.toggle', rid=r.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="{{ request.full_path }}">
+            <button class="btn btn-sm py-0 {{ 'btn-outline-success' if r.status=='inactive' else 'btn-outline-warning' }}">
+              {{ 'Activate' if r.status=='inactive' else 'Deactivate' }}
+            </button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="text-muted small">{{ rows|length }} recipe(s)</div>
+</div></div>
+{% endblock %}

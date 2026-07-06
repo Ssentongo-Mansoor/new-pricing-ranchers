@@ -1,0 +1,225 @@
+{% extends "costing/_shell.html" %}
+{% block heading %}{{ 'Edit' if carcass else 'New' }} Carcass{% endblock %}
+{% block costing_content %}
+<form method="post" id="carcassForm">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="row">
+  <div class="col-lg-8">
+    <div class="card mb-3"><div class="card-body">
+      <div class="row">
+        <div class="col-md-6 mb-3"><label class="form-label">Label</label>
+          <input name="label" class="form-control" required placeholder="e.g. Pork carcass 12 Jun" value="{{ carcass.label if carcass else '' }}"></div>
+        <div class="col-md-3 mb-3"><label class="form-label">Species</label>
+          <select name="species" id="species" class="form-select">
+            {% for s in species %}<option value="{{ s }}" {{ 'selected' if carcass and carcass.species==s }}>{{ s }}</option>{% endfor %}
+          </select></div>
+        <div class="col-md-3 mb-3"><label class="form-label">Allocation</label>
+          <select name="allocation_method" id="method" class="form-select calc">
+            <option value="value" {{ 'selected' if carcass and carcass.allocation_method=='value' }}>By market value</option>
+            <option value="weight" {{ 'selected' if carcass and carcass.allocation_method=='weight' }}>By weight</option>
+          </select></div>
+      </div>
+      <div class="row">
+        <div class="col-md-3 mb-3"><label class="form-label">Carcass weight (kg)</label>
+          <input name="carcass_weight_kg" id="carcassWeight" type="number" step="0.01" class="form-control calc" value="{{ carcass.carcass_weight_kg if carcass else 0 }}"></div>
+        <div class="col-md-3 mb-3"><label class="form-label">Purchase cost (total)</label>
+          <input name="purchase_cost" id="purchaseCost" type="number" step="0.01" class="form-control calc" value="{{ carcass.purchase_cost if carcass else 0 }}"></div>
+        <div class="col-md-3 mb-3"><label class="form-label">Processing fee / kg <span class="text-muted small">(flat)</span></label>
+          <input name="processing_fee_per_kg" id="procFee" type="number" step="0.01" class="form-control calc" value="{{ carcass.processing_fee_per_kg if carcass else 0 }}"></div>
+        <div class="col-md-3 mb-3"><label class="form-label">Injection % <span class="text-muted small">(e.g. 0.15)</span></label>
+          <input name="injection_pct" id="injPct" type="number" step="0.01" class="form-control calc" value="{{ carcass.injection_pct if carcass else 0 }}"></div>
+      </div>
+      <h6 class="text-uppercase small text-muted">Extra landed costs (slaughter, transport...)</h6>
+      <table class="table table-sm"><tbody id="costBody"></tbody></table>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="addCost"><i class="bi bi-plus"></i> Add cost</button>
+    </div></div>
+
+    <div class="card mb-3"><div class="card-body">
+      <div class="d-flex align-items-center mb-2">
+        <h6 class="text-uppercase small text-muted mb-0">Cuts</h6>
+        <div class="spacer flex-grow-1"></div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="prefill"><i class="bi bi-magic"></i> Prefill typical cuts</button>
+      </div>
+      <table class="table table-sm line-table">
+        <thead><tr><th style="width:20%">Cut</th><th class="num">Weight (kg)</th><th class="num">Sell/kg</th><th class="num">Export/kg</th><th class="num">Cost/kg</th><th class="num">Margin %</th><th class="text-center" title="Gains weight when injected">Inj</th><th>Link to ingredient</th><th></th></tr></thead>
+        <tbody id="cutBody"></tbody>
+      </table>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="addCut"><i class="bi bi-plus"></i> Add cut</button>
+      <datalist id="ingOptions"></datalist>
+    </div></div>
+
+    <div class="mb-3"><label class="form-label">Note</label>
+      <textarea name="note" class="form-control" rows="2">{{ carcass.note or '' if carcass else '' }}</textarea></div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card builder-totals"><div class="card-body">
+      <h6 class="text-uppercase small text-muted">Live breakdown</h6>
+      <table class="table table-sm mb-2">
+        <tr><td>Landed cost</td><td class="num" id="tLanded">0</td></tr>
+        <tr><td>Total cost (incl. fee)</td><td class="num" id="tTotalCost">0</td></tr>
+        <tr><td>Avg cost / kg</td><td class="num" id="tAvgCpk">0</td></tr>
+        <tr><td>Cut weight</td><td class="num"><span id="tCutWeight">0</span> kg</td></tr>
+        <tr><td>Loss</td><td class="num"><span id="tLoss">0</span> (<span id="tLossPct">0</span>%)</td></tr>
+        <tr><td>Revenue (local)</td><td class="num" id="tRevenue">0</td></tr>
+        <tr class="table-active fw-bold"><td>Profit (local)</td><td class="num" id="tProfit">0</td></tr>
+        <tr id="rExportRev" style="display:none"><td>Revenue (export)</td><td class="num" id="tExportRev">0</td></tr>
+        <tr id="rExportProfit" style="display:none" class="fw-bold"><td>Profit (export)</td><td class="num" id="tExportProfit">0</td></tr>
+        <tr id="rInjRev" style="display:none"><td>Revenue (injected)</td><td class="num" id="tInjRev">0</td></tr>
+        <tr id="rInjProfit" style="display:none" class="fw-bold"><td>Profit (injected)</td><td class="num" id="tInjProfit">0</td></tr>
+      </table>
+      <button class="btn btn-rf w-100">Save carcass</button>
+      <a class="btn btn-link w-100" href="{{ url_for('cuts.index') }}">Cancel</a>
+    </div></div>
+  </div>
+</div>
+</form>
+
+<template id="costTpl">
+  <tr><td><input name="cost_name" class="form-control form-control-sm" placeholder="e.g. Transport"></td>
+  <td style="width:34%"><input name="cost_amount" type="number" step="0.01" class="form-control form-control-sm num calc" value="0"></td>
+  <td style="width:40px"><button type="button" class="btn btn-sm btn-outline-danger py-0 del"><i class="bi bi-x"></i></button></td></tr>
+</template>
+<template id="cutTpl">
+  <tr>
+    <td><input name="cut_name" class="form-control form-control-sm" placeholder="Cut name"></td>
+    <td><input name="cut_weight" type="number" step="0.001" class="form-control form-control-sm num calc cut-weight" value="0"></td>
+    <td><input name="cut_sell" type="number" step="0.01" class="form-control form-control-sm num calc cut-sell" value="0"></td>
+    <td><input name="cut_export" type="number" step="0.01" class="form-control form-control-sm num calc cut-export" value="0"></td>
+    <td class="num cut-cpk text-rf">0</td>
+    <td class="num cut-margin">0%</td>
+    <td class="text-center"><input type="checkbox" class="form-check-input cut-inject-cb"><input type="hidden" name="cut_injectable" value="0"></td>
+    <td><input class="form-control form-control-sm cut-ing-name" list="ingOptions" placeholder="optional" autocomplete="off"><input type="hidden" name="cut_ingredient" value=""></td>
+    <td><button type="button" class="btn btn-sm btn-outline-danger py-0 del"><i class="bi bi-x"></i></button></td>
+  </tr>
+</template>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const costBody = document.getElementById('costBody');
+const cutBody = document.getElementById('cutBody');
+const costTpl = document.getElementById('costTpl');
+const cutTpl = document.getElementById('cutTpl');
+const dataList = document.getElementById('ingOptions');
+const ingMap = {};
+const DEFAULT_CUTS = {{ default_cuts|tojson }};
+function fmt(v){ return Math.round(v).toLocaleString('en-US'); }
+
+async function searchIng(q) {
+  if (!q) return;
+  const res = await fetch('/ingredients/search.json?q=' + encodeURIComponent(q)).then(r=>r.json());
+  dataList.innerHTML = '';
+  res.forEach(it => {
+    ingMap[it.name.toLowerCase()] = it.id;
+    const o = document.createElement('option'); o.value = it.name; o.label = 'now ' + fmt(it.cost);
+    dataList.appendChild(o);
+  });
+}
+
+function addCost(name, amt) {
+  const tr = costTpl.content.cloneNode(true).querySelector('tr');
+  if (name !== undefined) { tr.querySelector('[name=cost_name]').value = name; tr.querySelector('[name=cost_amount]').value = amt; }
+  tr.querySelector('.del').addEventListener('click', () => { tr.remove(); recalc(); });
+  tr.querySelector('.calc').addEventListener('input', recalc);
+  costBody.appendChild(tr);
+}
+function bindCut(tr) {
+  const nameInput = tr.querySelector('.cut-ing-name');
+  const hidden = tr.querySelector('[name=cut_ingredient]');
+  let t;
+  nameInput.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => searchIng(nameInput.value), 150); });
+  nameInput.addEventListener('change', () => { hidden.value = ingMap[nameInput.value.trim().toLowerCase()] || ''; });
+  const cb = tr.querySelector('.cut-inject-cb');
+  const cbHidden = tr.querySelector('[name=cut_injectable]');
+  cb.addEventListener('change', () => { cbHidden.value = cb.checked ? '1' : '0'; recalc(); });
+  tr.querySelectorAll('.calc').forEach(e => e.addEventListener('input', recalc));
+  tr.querySelector('.del').addEventListener('click', () => { tr.remove(); recalc(); });
+}
+function addCut(data) {
+  const tr = cutTpl.content.cloneNode(true).querySelector('tr');
+  if (data) {
+    tr.querySelector('[name=cut_name]').value = data.name || '';
+    tr.querySelector('[name=cut_weight]').value = data.weight || 0;
+    tr.querySelector('[name=cut_sell]').value = data.sell || 0;
+    tr.querySelector('[name=cut_export]').value = data.export || 0;
+    if (data.injectable) { tr.querySelector('.cut-inject-cb').checked = true; tr.querySelector('[name=cut_injectable]').value = '1'; }
+    if (data.ing_name) { tr.querySelector('.cut-ing-name').value = data.ing_name; tr.querySelector('[name=cut_ingredient]').value = data.ing_id || ''; if (data.ing_id) ingMap[data.ing_name.toLowerCase()] = data.ing_id; }
+  }
+  cutBody.appendChild(tr);
+  bindCut(tr);
+}
+
+let timer;
+function recalc(){ clearTimeout(timer); timer = setTimeout(doRecalc, 120); }
+function doRecalc() {
+  const cuts = [...cutBody.querySelectorAll('tr')].map(tr => ({
+    weight: tr.querySelector('.cut-weight').value,
+    sell: tr.querySelector('.cut-sell').value,
+    export: tr.querySelector('.cut-export').value,
+    injectable: tr.querySelector('.cut-inject-cb').checked }));
+  const extra = [...costBody.querySelectorAll('[name=cost_amount]')].map(e => e.value);
+  const payload = {
+    method: document.getElementById('method').value,
+    carcass_weight: document.getElementById('carcassWeight').value,
+    purchase_cost: document.getElementById('purchaseCost').value,
+    processing_fee: document.getElementById('procFee').value,
+    injection_pct: document.getElementById('injPct').value,
+    extra_costs: extra, cuts: cuts,
+  };
+  fetch('/cuts/calc.json', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})
+    .then(r=>r.json()).then(d => {
+      document.getElementById('tLanded').textContent = fmt(d.landed);
+      document.getElementById('tTotalCost').textContent = fmt(d.total_cost);
+      document.getElementById('tAvgCpk').textContent = fmt(d.avg_cpk);
+      document.getElementById('tCutWeight').textContent = (d.cut_weight||0).toFixed(2);
+      document.getElementById('tLoss').textContent = (d.loss||0).toFixed(2) + ' kg';
+      document.getElementById('tLossPct').textContent = (d.loss_pct||0).toFixed(1);
+      document.getElementById('tRevenue').textContent = fmt(d.revenue);
+      const p = document.getElementById('tProfit');
+      p.textContent = fmt(d.profit); p.className = 'num ' + (d.profit>=0 ? 'text-success':'text-danger');
+      const showExp = d.has_export;
+      document.getElementById('rExportRev').style.display = showExp ? '' : 'none';
+      document.getElementById('rExportProfit').style.display = showExp ? '' : 'none';
+      if (showExp) {
+        document.getElementById('tExportRev').textContent = fmt(d.export_revenue);
+        const ep = document.getElementById('tExportProfit');
+        ep.textContent = fmt(d.export_profit); ep.className = 'num ' + (d.export_profit>=0 ? 'text-success':'text-danger');
+      }
+      const showInj = d.injected;
+      document.getElementById('rInjRev').style.display = showInj ? '' : 'none';
+      document.getElementById('rInjProfit').style.display = showInj ? '' : 'none';
+      if (showInj) {
+        document.getElementById('tInjRev').textContent = fmt(d.injected_revenue);
+        const ip = document.getElementById('tInjProfit');
+        ip.textContent = fmt(d.injected_profit); ip.className = 'num ' + (d.injected_profit>=0 ? 'text-success':'text-danger');
+      }
+      const trs = [...cutBody.querySelectorAll('tr')];
+      d.rows.forEach((row, i) => {
+        if (!trs[i]) return;
+        trs[i].querySelector('.cut-cpk').textContent = fmt(row.cpk);
+        const m = trs[i].querySelector('.cut-margin');
+        m.textContent = row.margin_pct.toFixed(0) + '%';
+        m.className = 'num cut-margin ' + (row.margin>=0 ? 'text-success':'text-danger');
+      });
+    });
+}
+
+document.getElementById('addCost').addEventListener('click', () => addCost());
+document.getElementById('addCut').addEventListener('click', () => addCut());
+document.querySelectorAll('.calc').forEach(e => e.addEventListener('input', recalc));
+document.getElementById('prefill').addEventListener('click', () => {
+  const sp = document.getElementById('species').value;
+  (DEFAULT_CUTS[sp] || []).forEach(n => addCut({name: n}));
+  recalc();
+});
+
+{% if carcass %}
+{% for c in carcass.costs %}addCost({{ c.name|tojson }}, {{ c.amount }});{% endfor %}
+{% for c in carcass.cuts %}addCut({name: {{ c.name|tojson }}, weight: {{ c.weight_kg }}, sell: {{ c.selling_price }}, export: {{ c.export_price }}, injectable: {{ 'true' if c.injectable else 'false' }}, ing_name: {{ (c.ingredient.name if c.ingredient else '')|tojson }}, ing_id: {{ c.ingredient_id or 'null' }} });{% endfor %}
+{% else %}
+addCost('Slaughter / processing', 0); addCost('Transport', 0);
+{% endif %}
+doRecalc();
+</script>
+{% endblock %}

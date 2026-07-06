@@ -1,0 +1,62 @@
+{% extends "costing/_shell.html" %}
+{% block heading %}{{ 'Edit' if mix else 'New' }} Spice Mix{% endblock %}
+{% block costing_content %}
+<div class="page-head"><h1>{{ 'Edit' if mix else 'New' }} Spice Mix</h1></div>
+<form method="post" class="card" style="max-width:920px">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><div class="card-body">
+  <div class="row">
+    <div class="col-md-6 mb-3"><label class="form-label">Mix name</label><input name="name" class="form-control" required value="{{ mix.name if mix else '' }}"></div>
+    <div class="col-md-6 mb-3"><label class="form-label">Note</label><input name="note" class="form-control" value="{{ mix.note or '' if mix else '' }}"></div>
+  </div>
+  <table class="table table-sm line-table" id="lineTable">
+    <thead><tr><th style="width:34%">Ingredient</th><th>Link to master (optional)</th><th class="num" style="width:14%">Mass (kg)</th><th class="num" style="width:14%">Cost/kg</th><th></th></tr></thead>
+    <tbody id="lineBody"></tbody>
+  </table>
+  <button type="button" class="btn btn-sm btn-outline-secondary" id="addLine"><i class="bi bi-plus"></i> Add line</button>
+  <hr>
+  <button class="btn btn-rf">Save spice mix</button>
+  <a class="btn btn-link" href="{{ url_for('spice_mixes.index') }}">Cancel</a>
+</div></form>
+
+<template id="rowTpl">
+  <tr>
+    <td><input name="line_name" class="form-control form-control-sm" required></td>
+    <td>
+      <select name="line_ingredient" class="form-select form-select-sm ing-select">
+        <option value="">— manual cost —</option>
+        {% for ing in ingredients %}<option value="{{ ing.id }}">{{ ing.name }}</option>{% endfor %}
+      </select>
+    </td>
+    <td><input name="line_mass" type="number" step="0.0001" class="form-control form-control-sm num" value="0"></td>
+    <td><input name="line_cost" type="number" step="0.0001" class="form-control form-control-sm num" value="0"></td>
+    <td><button type="button" class="btn btn-sm btn-outline-danger py-0 del"><i class="bi bi-x"></i></button></td>
+  </tr>
+</template>
+{% endblock %}
+{% block scripts %}
+<script>
+const tbody = document.getElementById('lineBody');
+const tpl = document.getElementById('rowTpl');
+function addRow(data) {
+  const node = tpl.content.cloneNode(true);
+  const tr = node.querySelector('tr');
+  if (data) {
+    tr.querySelector('[name=line_name]').value = data.name || '';
+    tr.querySelector('[name=line_mass]').value = data.mass || 0;
+    tr.querySelector('[name=line_cost]').value = data.cost || 0;
+    if (data.ingredient_id) tr.querySelector('[name=line_ingredient]').value = data.ingredient_id;
+  }
+  tr.querySelector('.del').addEventListener('click', () => tr.remove());
+  tbody.appendChild(tr);
+}
+document.getElementById('addLine').addEventListener('click', () => addRow());
+const existing = {{ (mix.lines if mix else [])|map(attribute='display_name')|list|tojson }};
+{% if mix %}
+{% for l in mix.lines %}
+addRow({name: {{ l.display_name|tojson }}, mass: {{ l.mass_kg }}, cost: {{ l.cost_override or 0 }}, ingredient_id: {{ l.ingredient_id or 'null' }} });
+{% endfor %}
+{% else %}
+addRow(); addRow();
+{% endif %}
+</script>
+{% endblock %}

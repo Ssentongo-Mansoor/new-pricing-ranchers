@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block heading %}Exchange Rates{% endblock %}
+{% block content %}
+{% if current_user.is_admin %}{% include "admin/_nav.html" %}{% endif %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <p class="text-muted mb-0">UGX is the base of value. Foreign figures derive from UGX at the rate in force.</p>
+  {% if can_edit %}<a class="btn btn-primary" href="{{ url_for('exchange_rates.new') }}"><i class="bi bi-plus-lg"></i> Set a rate</a>
+  {% else %}<span class="badge bg-secondary">read-only</span>{% endif %}
+</div>
+
+<div class="row g-3 mb-3">
+  {% for q, r in current_rates.items() %}
+  <div class="col-md-4"><div class="rf-stat">
+    <div class="lbl">Current UGX → {{ q }}</div>
+    {% if r %}<div class="num">{{ '%.0f'|format(r.rate) }}</div>
+      <div class="small">{% set st=r.status_for() %}
+        {% if st=='expired' %}<span class="badge badge-danger">expired {{ r.expiry_date }}</span>
+        {% elif st=='expiring' %}<span class="badge badge-warn">expiring {{ r.expiry_date }}</span>
+        {% elif st=='valid' %}<span class="badge badge-ok">valid to {{ r.expiry_date }}</span>
+        {% else %}<span class="badge bg-secondary">open</span>{% endif %}</div>
+    {% else %}<div class="num text-danger">—</div><div class="small text-danger">No valid rate. USD exports blocked.</div>{% endif %}
+  </div></div>
+  {% endfor %}
+</div>
+
+<div class="table-responsive rf-card">
+<table class="table table-sm align-middle mb-0">
+  <thead><tr><th>Pair</th><th class="text-end">Rate (UGX per 1)</th><th>Effective</th><th>Expiry</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for r in rates %}
+    <tr>
+      <td>UGX → {{ r.quote_ccy }}</td>
+      <td class="text-end money">{{ '%.4f'|format(r.rate) }}</td>
+      <td>{{ r.effective_date }}</td>
+      <td>{{ r.expiry_date or '—' }}</td>
+      <td>{% set st=r.status_for() %}
+        {% if st=='expired' %}<span class="badge badge-danger">expired</span>
+        {% elif st=='expiring' %}<span class="badge badge-warn">expiring</span>
+        {% elif st=='valid' %}<span class="badge badge-ok">valid</span>
+        {% else %}<span class="badge bg-secondary">open</span>{% endif %}</td>
+    </tr>
+  {% else %}<tr><td colspan="5" class="text-center text-muted py-4">No rates set.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

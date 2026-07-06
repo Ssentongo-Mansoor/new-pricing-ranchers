@@ -1,0 +1,79 @@
+{% extends "costing/_shell.html" %}
+{% block heading %}Settings{% endblock %}
+{% block costing_content %}
+<div class="page-head"><h1>Settings</h1></div>
+<div class="row">
+  <div class="col-lg-5">
+    <div class="card mb-3"><div class="card-body">
+      <h6 class="text-uppercase small text-muted">Global settings</h6>
+      {% if not current_user.is_admin %}<p class="small text-muted">Only admins can change global settings.</p>{% endif %}
+      <form method="post" action="{{ url_for('settings.save') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% for key, label, is_pct in fields %}
+        <div class="mb-3">
+          <label class="form-label">{{ label }}{% if is_pct %} <span class="text-muted small">(%)</span>{% endif %}</label>
+          <input name="{{ key }}" class="form-control" value="{{ values[key] }}" {{ 'readonly' if not current_user.is_admin }}>
+        </div>
+        {% endfor %}
+        {% if current_user.is_admin %}<button class="btn btn-rf">Save settings</button>{% endif %}
+      </form>
+    </div></div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card"><div class="card-body">
+      <h6 class="text-uppercase small text-muted">Categories</h6>
+      {% if has_perm(current_user, 'edit_costing') %}
+      <form class="row g-2 mb-3" method="post" action="{{ url_for('settings.category_new') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="col-8"><input name="name" class="form-control form-control-sm" placeholder="New category name" required></div>
+        <div class="col-4"><button class="btn btn-sm btn-rf w-100">Add category</button></div>
+      </form>
+      {% endif %}
+      <table class="table table-sm align-middle">
+        <thead><tr><th>Order</th><th>Name</th><th class="num">Active products</th><th></th></tr></thead>
+        <tbody>
+          {% for c in categories %}
+          <tr>
+            <td>
+              {% if has_perm(current_user, 'edit_costing') %}
+              <form class="d-inline" method="post" action="{{ url_for('settings.category_move', cid=c.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="dir" value="up"><button class="btn btn-sm btn-light py-0"><i class="bi bi-arrow-up"></i></button></form>
+              <form class="d-inline" method="post" action="{{ url_for('settings.category_move', cid=c.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="dir" value="down"><button class="btn btn-sm btn-light py-0"><i class="bi bi-arrow-down"></i></button></form>
+              {% else %}{{ c.display_order }}{% endif %}
+            </td>
+            <td>
+              {% if has_perm(current_user, 'edit_costing') %}
+              <form class="d-flex gap-1" method="post" action="{{ url_for('settings.category_rename', cid=c.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input name="name" class="form-control form-control-sm" value="{{ c.name }}" style="max-width:240px">
+                <button class="btn btn-sm btn-outline-secondary py-0"><i class="bi bi-check"></i></button>
+              </form>
+              {% else %}{{ c.name }}{% endif %}
+            </td>
+            <td class="num">{{ c.active_recipe_count }}</td>
+            <td class="text-nowrap">
+              {% if has_perm(current_user, 'edit_costing') %}
+              <button class="btn btn-sm btn-outline-secondary py-0" data-bs-toggle="collapse" data-bs-target="#merge{{ c.id }}">Merge</button>
+              <form class="d-inline" method="post" action="{{ url_for('settings.category_delete', cid=c.id) }}" onsubmit="return confirm('Delete category {{ c.name }}?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger py-0"><i class="bi bi-trash"></i></button></form>
+              <div class="collapse mt-1" id="merge{{ c.id }}">
+                <form class="d-flex gap-1" method="post" action="{{ url_for('settings.category_merge', cid=c.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <select name="target_id" class="form-select form-select-sm">
+                    {% for t in categories if t.id != c.id %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+                  </select>
+                  <button class="btn btn-sm btn-warning py-0">Merge into</button>
+                </form>
+              </div>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div></div>
+  </div>
+</div>
+{% endblock %}

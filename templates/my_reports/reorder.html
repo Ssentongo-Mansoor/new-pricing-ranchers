@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block heading %}Reorder due{% endblock %}
+{% block content %}
+{% include "my_reports/_nav.html" %}
+<p class="text-muted small">Predicted from each customer&#39;s ordering cadence (needs at least three past orders).</p>
+{% if overdue %}
+<div class="alert alert-danger py-2 small"><strong>{{ overdue|length }}</strong> customer(s) are overdue to reorder.</div>
+{% endif %}
+<div class="rf-card p-0">
+  <table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Customer</th><th>Last order</th><th>Every ~</th><th>Predicted next</th><th>Due</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr class="{{ 'table-danger' if r.due_in < 0 else ('table-warning' if r.due_in <= 7 else '') }}">
+        <td class="fw-semibold small">{{ r.customer.name }}</td>
+        <td class="small">{{ r.last.strftime('%d %b %Y') }}</td>
+        <td class="small">{{ r.avg }} days</td>
+        <td class="small">{{ r.predicted.strftime('%d %b %Y') }}</td>
+        <td class="small">{% if r.due_in < 0 %}<span class="text-danger">{{ -r.due_in }}d overdue</span>{% elif r.due_in==0 %}today{% else %}in {{ r.due_in }}d{% endif %}</td>
+      </tr>
+    {% else %}<tr><td colspan="5" class="text-center text-muted py-3">Not enough order history yet.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

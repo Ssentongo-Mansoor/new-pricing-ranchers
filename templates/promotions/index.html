@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block heading %}Promotions{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <p class="text-muted mb-0">Updates and promotions shown on the customer portal. Target customers, distributors, or everyone.</p>
+  <a class="btn btn-primary" href="{{ url_for('promotions.new') }}"><i class="bi bi-plus-lg"></i> New promotion</a>
+</div>
+
+<div class="row g-3">
+{% for p in items %}
+  <div class="col-lg-6">
+    <div class="rf-card h-100 overflow-hidden">
+      <div class="row g-0">
+        {% if p.image_filename %}<div class="col-4"><img src="{{ url_for('promotions.image', promo_id=p.id) }}" class="img-fluid h-100 w-100" style="object-fit:cover"></div>{% endif %}
+        <div class="col">
+          <div class="p-3">
+            <div class="d-flex justify-content-between">
+              <h2 class="h6 mb-1">{{ p.title }}</h2>
+              {% if p.is_live() %}<span class="badge badge-ok">live</span>
+              {% elif not p.is_active %}<span class="badge bg-secondary">off</span>
+              {% else %}<span class="badge badge-warn">out of window</span>{% endif %}
+            </div>
+            <div class="small text-muted mb-1">
+              Audience: <span class="text-capitalize">{{ p.audience }}</span>
+              {% if p.valid_from or p.valid_until %} · {{ p.valid_from or '' }} → {{ p.valid_until or '' }}{% endif %}
+            </div>
+            {% if p.body %}<p class="small mb-2" style="white-space:pre-line">{{ p.body[:140] }}{% if p.body|length>140 %}…{% endif %}</p>{% endif %}
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('promotions.edit', promo_id=p.id) }}"><i class="bi bi-pencil"></i> Edit</a>
+            <form method="post" action="{{ url_for('promotions.delete', promo_id=p.id) }}" class="d-inline" onsubmit="return confirm('Delete this promotion?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% else %}
+  <div class="col-12"><div class="rf-card p-4 text-center text-muted">No promotions yet. Post one to show it on customers' portals.</div></div>
+{% endfor %}
+</div>
+{% endblock %}

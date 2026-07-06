@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block heading %}Price history · {{ pl.name }}{% endblock %}
+{% block content %}
+<a href="{{ url_for('customer_pricelists.detail', list_id=pl.id) if customer else url_for('pricelists.detail', list_id=pl.id) }}" class="small">&larr; Back to pricelist</a>
+
+<div class="table-responsive rf-card mt-2">
+<table class="table table-sm align-middle mb-0">
+  <thead><tr><th>When</th><th>Who</th><th>Article</th><th>Description</th><th>Tier</th><th class="text-end">Old</th><th class="text-end">New</th><th>Change</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td class="small text-nowrap">{{ r.ts.strftime('%Y-%m-%d %H:%M') }}</td>
+      <td class="small">{{ r.user or '—' }}</td>
+      <td class="fw-semibold">{{ r.article }}</td>
+      <td class="small">{{ r.desc }}</td>
+      <td class="small">{{ r.field or '' }}</td>
+      <td class="text-end money">{{ r.old if r.old is not none else '' }}</td>
+      <td class="text-end money fw-semibold">{{ r.new if r.new is not none else '' }}</td>
+      <td>
+        {% if r.action=='bulk_adjust' %}<span class="badge bg-secondary">bulk</span>
+        {% elif r.action=='override_set' %}<span class="badge badge-fixed">fixed set</span>
+        {% elif r.action=='override_clear' %}<span class="badge bg-secondary">fixed cleared</span>
+        {% else %}<span class="badge" style="background:var(--rf-orange)">edit</span>{% endif %}
+      </td>
+    </tr>
+  {% else %}<tr><td colspan="8" class="text-center text-muted py-4">No price changes recorded for this list yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if list_entries %}
+<h2 class="h6 mt-4">List changes</h2>
+<div class="table-responsive rf-card">
+<table class="table table-sm align-middle mb-0">
+  <tbody>
+  {% for e in list_entries %}
+    <tr><td class="small text-nowrap">{{ e.ts.strftime('%Y-%m-%d %H:%M') }}</td><td class="small">{{ e.username or '—' }}</td>
+      <td class="small">{{ e.action }}</td><td class="small text-muted">{{ e.detail }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% endblock %}

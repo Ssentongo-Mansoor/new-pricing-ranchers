@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block heading %}Catalogue{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h5 mb-0">{{ label or 'Product catalogue' }}</h1>
+    {% if updated %}<div class="text-muted small">Updated {{ updated }}</div>{% endif %}
+  </div>
+  {% if has_file %}
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('catalogue.file') }}" target="_blank"><i class="bi bi-box-arrow-up-right"></i> Open in new tab</a>
+    <a class="btn btn-primary" href="{{ url_for('catalogue.download') }}"><i class="bi bi-download"></i> Download</a>
+  </div>
+  {% endif %}
+</div>
+
+{% if has_file %}
+<div class="rf-card p-0 overflow-hidden" style="height:80vh">
+  <iframe src="{{ url_for('catalogue.file') }}#view=FitH" title="Catalogue"
+          style="width:100%;height:100%;border:0"></iframe>
+</div>
+{% else %}
+<div class="rf-card p-5 text-center text-muted">
+  <i class="bi bi-journal-text" style="font-size:2rem"></i>
+  <p class="mb-0 mt-2">No catalogue uploaded yet.</p>
+  {% if current_user.is_admin %}<a class="btn btn-primary mt-3" href="{{ url_for('catalogue.manage') }}">Upload the catalogue</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

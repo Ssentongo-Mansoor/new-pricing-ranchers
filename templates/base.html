@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <script>
+  (function(){
+    var meta=document.querySelector('meta[name=csrf-token]');
+    var _csrf=meta?meta.content:'';
+    var _origFetch=window.fetch;
+    window.fetch=function(u,o){
+      o=o||{};
+      var m=((o.method||'GET')+'').toUpperCase();
+      if(m!=='GET'&&m!=='HEAD'&&m!=='OPTIONS'&&m!=='TRACE'){
+        o.headers=Object.assign({},o.headers,{'X-CSRFToken':_csrf});
+      }
+      return _origFetch.call(this,u,o);
+    };
+  })();
+  </script>
+  <title>{% block title %}{{ app_name }}{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/brand.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  {% if theme == 'artisanal' %}<link rel="stylesheet" href="{{ url_for('static', filename='css/brand-artisanal.css') }}">{% endif %}
+  <link rel="icon" href="{{ url_for('static', filename='img/ranchers-logo.png') }}">
+</head>
+<body>
+{% if current_user.is_authenticated %}
+<div class="rf-layout">
+  <aside class="rf-sidebar" id="rfSidebar">
+    <div class="rf-logo">
+      <a href="{{ url_for('dashboard.home') }}">
+        <img src="{{ url_for('static', filename='img/ranchers-logo.svg') }}" alt="{{ company_name }}">
+      </a>
+    </div>
+    <nav class="nav flex-column">
+      {% set ep = request.endpoint or '' %}
+      {% macro navgroup(label) -%}
+      <div class="text-uppercase small fw-semibold px-3 mt-3 mb-1" style="opacity:.5;letter-spacing:.04em">{{ label }}</div>
+      {%- endmacro %}
+      {% if current_user.is_ceo or current_user.is_sales_director %}
+      {# CEO / Sales director: Dashboard first, then Reports, Approvals, then the rest, grouped by module. #}
+      <a class="nav-link {{ 'active' if ep.startswith('dashboard') }}" href="{{ url_for('dashboard.home') }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
+      {{ navgroup('Reports') }}
+      <a class="nav-link {{ 'active' if ep.startswith('reports') }}" href="{{ url_for('reports.index') }}"><i class="bi bi-bar-chart-line"></i> Reports</a>
+      <a class="nav-link {{ 'active' if ep=='crm.reports' }}" href="{{ url_for('crm.reports') }}"><i class="bi bi-clipboard-data"></i> CRM reports</a>
+      {{ navgroup('Approvals') }}
+      <a class="nav-link {{ 'active' if ep.startswith('approvals') }}" href="{{ url_for('approvals.index') }}"><i class="bi bi-check2-square"></i> Approvals{% if approvals_pending %} <span class="badge badge-danger">{{ approvals_pending }}</span>{% endif %}</a>
+      <a class="nav-link {{ 'active' if ep=='customers.onboarding_queue' }}" href="{{ url_for('customers.onboarding_queue') }}"><i class="bi bi-person-plus"></i> Onboarding{% if pending_onboarding %} <span class="badge badge-danger">{{ pending_onboarding }}</span>{% endif %}</a>
+      {{ navgroup('Sales') }}
+      <a class="nav-link {{ 'active' if ep.startswith('orders') }}" href="{{ url_for('orders.index') }}"><i class="bi bi-cart-check"></i> Orders</a>
+      <a class="nav-link {{ 'active' if ep.startswith('offers') }}" href="{{ url_for('offers.index') }}"><i class="bi bi-receipt"></i> Quotes</a>
+      <a class="nav-link {{ 'active' if ep.startswith('customers') and ep not in ['customers.distributors','customers.onboarding_queue'] }}" href="{{ url_for('customers.index') }}"><i class="bi bi-person-vcard"></i> Customers</a>
+      <a class="nav-link {{ 'active' if ep=='customers.distributors' }}" href="{{ url_for('customers.distributors') }}"><i class="bi bi-truck"></i> Distributors</a>
+      <a class="nav-link {{ 'active' if ep.startswith('targets') }}" href="{{ url_for('targets.index') }}"><i class="bi bi-bullseye"></i> Rep targets</a>
+      <a class="nav-link {{ 'active' if ep.startswith('reps') }}" href="{{ url_for('reps.index') }}"><i class="bi bi-people-fill"></i> Reps</a>
+      <a class="nav-link {{ 'active' if ep=='crm.follow_ups' }}" href="{{ url_for('crm.follow_ups') }}"><i class="bi bi-flag"></i> Follow-ups</a>
+      <a class="nav-link {{ 'active' if ep.startswith('messages') }}" href="{{ url_for('messages.index') }}"><i class="bi bi-chat-dots"></i> Messages{% if staff_unread %} <span class="badge badge-danger">{{ staff_unread }}</span>{% endif %}</a>
+      {{ navgroup('Pricing & catalogue') }}
+      <a class="nav-link {{ 'active' if ep.startswith('pricelists') or ep.startswith('customer_pricelists') }}" href="{{ url_for('pricelists.index') }}"><i class="bi bi-card-list"></i> Pricelists</a>
+      <a class="nav-link {{ 'active' if ep.startswith('products') }}" href="{{ url_for('products.index') }}"><i class="bi bi-box-seam"></i> Products</a>
+      <a class="nav-link {{ 'active' if ep.startswith('price_promos') }}" href="{{ url_for('price_promos.index') }}"><i class="bi bi-tag"></i> Promotions</a>
+      <a class="nav-link {{ 'active' if ep.startswith('promotions') }}" href="{{ url_for('promotions.index') }}"><i class="bi bi-megaphone"></i> Portal announcements</a>
+      <a class="nav-link {{ 'active' if ep.startswith('catalogue') }}" href="{{ url_for('catalogue.view') }}"><i class="bi bi-journal-text"></i> Catalogue</a>
+      <a class="nav-link {{ 'active' if ep.startswith('exchange_rates') }}" href="{{ url_for('exchange_rates.index') }}"><i class="bi bi-currency-exchange"></i> Exchange Rates</a>
+      {{ navgroup('Stock') }}
+      <a class="nav-link {{ 'active' if ep=='stock.index' }}" href="{{ url_for('stock.index') }}"><i class="bi bi-boxes"></i> Stock</a>
+      <a class="nav-link {{ 'active' if ep.startswith('stock.store') }}" href="{{ url_for('stock.stores') }}"><i class="bi bi-shop"></i> Stores</a>
+      {% else %}
+      {% if current_user.is_rep %}
+      <a class="nav-link {{ 'active' if ep.startswith('dashboard') }}" href="{{ url_for('dashboard.home') }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
+      <a class="nav-link {{ 'active' if ep.startswith('pricelists') or ep.startswith('customer_pricelists') }}" href="{{ url_for('pricelists.index') }}"><i class="bi bi-card-list"></i> Pricelists</a>
+      <a class="nav-link {{ 'active' if ep.startswith('customers') and ep not in ['customers.distributors','customers.onboarding_queue'] }}" href="{{ url_for('customers.index') }}"><i class="bi bi-person-vcard"></i> Customers</a>
+      <a class="nav-link {{ 'active' if ep.startswith('offers') }}" href="{{ url_for('offers.index') }}"><i class="bi bi-receipt"></i> Quotes</a>
+      <a class="nav-link {{ 'active' if ep.startswith('orders') }}" href="{{ url_for('orders.index') }}"><i class="bi bi-cart-check"></i> Orders</a>
+      <a class="nav-link {{ 'active' if ep=='customers.distributors' }}" href="{{ url_for('customers.distributors') }}"><i class="bi bi-truck"></i> Distributors</a>
+      <a class="nav-link {{ 'active' if ep.startswith('catalogue') }}" href="{{ url_for('catalogue.view') }}"><i class="bi bi-journal-text"></i> Catalogue</a>
+      <a class="nav-link {{ 'active' if ep.startswith('messages') }}" href="{{ url_for('messages.index') }}"><i class="bi bi-chat-dots"></i> Messages{% if staff_unread %} <span class="badge badge-danger">{{ staff_unread }}</span>{% endif %}</a>
+      {% if has_perm(current_user, 'log_activity') %}
+      <a class="nav-link {{ 'active' if ep=='crm.follow_ups' }}" href="{{ url_for('crm.follow_ups') }}"><i class="bi bi-flag"></i> Follow-ups</a>
+      {% if features.pipeline %}<a class="nav-link {{ 'active' if ep=='crm.pipeline' }}" href="{{ url_for('crm.pipeline') }}"><i class="bi bi-kanban"></i> Pipeline</a>{% endif %}
+      {% if features.call_lists %}<a class="nav-link {{ 'active' if ep.startswith('crm.call_list') }}" href="{{ url_for('crm.call_lists') }}"><i class="bi bi-telephone-outbound"></i> Call lists</a>{% endif %}
+      {% endif %}
+      <a class="nav-link {{ 'active' if ep.startswith('products') }}" href="{{ url_for('products.index') }}"><i class="bi bi-box-seam"></i> Products</a>
+      <a class="nav-link {{ 'active' if ep.startswith('my_reports') }}" href="{{ url_for('my_reports.index') }}"><i class="bi bi-bar-chart-line"></i> Reports</a>
+      {% elif current_user.is_pricing_officer %}
+      <a class="nav-link {{ 'active' if ep.startswith('dashboard') }}" href="{{ url_for('dashboard.home') }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
+      <a class="nav-link {{ 'active' if ep.startswith('pricelists') or ep.startswith('customer_pricelists') }}" href="{{ url_for('pricelists.index') }}"><i class="bi bi-card-list"></i> Pricelists</a>
+      <a class="nav-link {{ 'active' if ep.startswith('customers') and ep not in ['customers.distributors','customers.onboarding_queue'] }}" href="{{ url_for('customers.index') }}"><i class="bi bi-person-vcard"></i> Customers</a>
+      <a class="nav-link {{ 'active' if ep.startswith('approvals') }}" href="{{ url_for('approvals.index') }}"><i class="bi bi-check2-square"></i> My approvals{% if approvals_pending %} <span class="badge badge-danger">{{ approvals_pending }}</span>{% endif %}</a>
+      <div class="text-uppercase small fw-semibold px-3 mt-3 mb-1" style="opacity:.5;letter-spacing:.04em">More</div>
+      <a class="nav-link {{ 'active' if ep=='customers.distributors' }}" href="{{ url_for('customers.distributors') }}"><i class="bi bi-truck"></i> Distributors</a>
+      <a class="nav-link {{ 'active' if ep=='customers.onboarding_queue' }}" href="{{ url_for('customers.onboarding_queue') }}"><i class="bi bi-person-plus"></i> Onboarding{% if pending_onboarding %} <span class="badge badge-danger">{{ pending_onboarding }}</span>{% endif %}</a>
+      <a class="nav-link {{ 'active' if ep.startswith('products') }}" href="{{ url_for('products.index') }}"><i class="bi bi-box-seam"></i> Products</a>
+      <a class="nav-link {{ 'active' if ep.startswith('price_promos') }}" href="{{ url_for('price_promos.index') }}"><i class="bi bi-tag"></i> Promotions</a>
+      <a class="nav-link {{ 'active' if ep.startswith('catalogue') }}" href="{{ url_for('catalogue.view') }}"><i class="bi bi-journal-text"></i> Catalogue</a>
+      {% elif current_user.is_order_manager %}
+      <a class="nav-link {{ 'active' if ep.startswith('dashboard') }}" href="{{ url_for('dashboard.home') }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
+      <a class="nav-link {{ 'active' if ep.startswith('messages') }}" href="{{ url_for('messages.index') }}"><i class="bi bi-chat-dots"></i> Messages{% if staff_unread %} <span class="badge badge-danger">{{ staff_unread }}</span>{% endif %}</a>
+      <a class="nav-link {{ 'active' if ep.startswith('orders') }}" href="{{ url_for('orders.index') }}"><i class="bi bi-cart-check"></i> Orders</a>
+      <a class="nav-link {{ 'active' if ep.startswith('offers') }}" href="{{ url_for('offers.index') }}"><i class="bi bi-receipt"></i> Quotes</a>
+      <a class="nav-link {{ 'active' if ep=='stock.index' }}" href="{{ url_for('stock.index') }}"><i class="bi bi-boxes"></i> Stock</a>
+      <a class="nav-link {{ 'active' if ep.startswith('pricelists') or ep.startswith('customer_pricelists') }}" href="{{ url_for('pricelists.index') }}"><i class="bi bi-card-list"></i> Pricelists</a>
+      <a class="nav-link {{ 'active' if ep.startswith('customers') and ep not in ['customers.distributors','customers.onboarding_queue'] }}" href="{{ url_for('customers.index') }}"><i class="bi bi-person-vcard"></i> Customers</a>
+      <a class="nav-link {{ 'active' if ep=='customers.distributors' }}" href="{{ url_for('customers.distributors') }}"><i class="bi bi-truck"></i> Distributors</a>
+      <a class="nav-link {{ 'active' if ep.startswith('stock.store') }}" href="{{ url_for('stock.stores') }}"><i class="bi bi-shop"></i> Stores</a>
+      <div class="text-uppercase small fw-semibold px-3 mt-3 mb-1" style="opacity:.5;letter-spacing:.04em">More</div>
+      <a class="nav-link {{ 'active' if ep.startswith('catalogue') }}" href="{{ url_for('catalogue.view') }}"><i class="bi bi-journal-text"></i> Catalogue</a>
+      {% if has_perm(current_user, 'log_activity') %}
+      <a class="nav-link {{ 'active' if ep=='crm.follow_ups' }}" href="{{ url_for('crm.follow_ups') }}"><i class="bi bi-flag"></i> Follow-ups</a>
+      {% endif %}
+      {% if has_perm(current_user, 'view_reports') %}
+      <a class="nav-link {{ 'active' if ep.startswith('reports') }}" href="{{ url_for('reports.index') }}"><i class="bi bi-bar-chart-line"></i> Reports</a>
+      {% endif %}
+      {% elif current_user.is_finance %}
+      {# Finance roles: what matters to them comes FIRST. Accounting on top,
+         then costing and oversight; no fulfilment noise. The cashier variant
+         collapses to the till (receipts) alone. #}
+      <a class="nav-link {{ 'active' if ep.startswith('dashboard') }}" href="{{ url_for('dashboard.home') }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
+      {{ navgroup('Accounting') }}
+      {% if has_perm(current_user, 'record_receipts') %}
+      <a class="nav-link {{ 'active' if ep.startswith('accounting.receipt') }}" href="{{ url_for('accounting.receipts') }}"><i class="bi bi-cash-coin"></i> Receipts</a>
+      {% endif %}
+      {% if has_perm(current_user, 'record_shop_sales') %}
+      <a class="nav-link {{ 'active' if ep.startswith('accounting.shop') }}" href="{{ url_for('accounting.shops') }}"><i class="bi bi-shop-window"></i> Shops</a>
+      {% endif %}
+      {% if has_perm(current_user, 'view_accounting') %}
+      {% if not has_perm(current_user, 'record_shop_sales') %}
+      <a class="nav-link {{ 'active' if ep.startswith('accounting.shop') }}" href="{{ url_for('accounting.shops') }}"><i class="bi bi-shop-window"></i> Shops</a>
+      {% endif %}
+      <a class="nav-link {{ 'active' if ep.startswith('accounting.invoice') }}" href="{{ url_for('accounting.invoices') }}"><i class="bi bi-receipt-cutoff"></i> Invoices</a>
+      {% if has_perm(current_user, 'record_purchases') %}
+      <a class="nav-link {{ 'active' if ep.startswith('accounting.purchase') }}" href="{{ url_for('accounting.purchases') }}"><i class="bi bi-bag"></i> Purchases</a>
+      {% endif %}
+      {% if has_perm(current_user, 'pay_suppliers') %}
+      <a class="nav-link {{ 'active' if ep.startswith('accounting.payment') }}" href="{{ url_for('accounting.payments') }}"><i class="bi bi-cash-stack"></i> Payments</a>
+      {% endif %}
+      <a class="nav-link {{ 'active' if ep.startswith('accounting.supplier') }}" href="{{ url_for('accounting.suppliers') }}"><i class="bi bi-truck-flatbed"></i> Suppliers</a>
+      <a class="nav-link {{ 'active' if ep.startswith('accounting.cash_bank') or ep.startswith('accounting.reconcile') }}" href="{{ url_for('accounting.cash_bank') }}"><i class="bi bi-bank"></i> Cash &amp; bank</a>
+      <a class="nav-link {{ 'active' if ep.startswith('accounting.journal') }}" href="{{ url_for('accounting.journal') }}"><i class="bi bi-journal-bookmark"></i> Journal</a>
+      <a class="nav-link {{ 'active' if ep.startswith('accounting.inventory') }}" href="{{ url_for('accounting.inventory') }}"><i class="bi bi-box-seam"></i> Inventory</a>
+      <a class="nav-link {{ 'active' if ep.startswith('accounting.report') or ep=='accounting.fin_reports' }}" href="{{ url_for('accounting.fin_reports') }}"><i class="bi bi-file-earmark-bar-graph"></i> Financial reports</a>
+      <a class="nav-link {{ 'active' if ep=='accounting.trial_balance' }}" href="{{ url_for('accounting.trial_balance') }}"><i class="bi bi-check2-square"></i> Trial balance</a>
+      <a class="nav-link {{ 'active' if ep=='accounting.accounts' }}" href="{{ url_for('accounting.accounts') }}"><i class="bi bi-list-columns"></i> Accounts</a>
+      {% endif %}
+      {% if has_perm(current_user, 'view_costing') %}
+      {{ navgroup('Costing') }}
+      <a class="nav-link {{ 'active' if ep.startswith('summary.') }}" href="{{ url_for('summary.dashboard') }}"><i class="bi bi-speedometer"></i> Cost dashboard</a>
+      <a class="nav-link {{ 'active' if ep.startswith('recipes.') }}" href="{{ url_for('recipes.index') }}"><i class="bi bi-card-checklist"></i> Recipes</a>
+      <a class="nav-link {{ 'active' if ep.startswith('cuts.') }}" href="{{ url_for('cuts.index') }}"><i class="bi bi-scissors"></i> Carcass cuts</a>
+      <a class="nav-link {{ 'active' if ep.startswith('whatif.') }}" href="{{ url_for('whatif.index') }}"><i class="bi bi-graph-up-arrow"></i> What-if</a>
+      {% endif %}
+      {% if has_perm(current_user, 'view_production') %}
+      {{ navgroup('Production') }}
+      <a class="nav-link {{ 'active' if ep in ['production.index','production.product_detail'] }}" href="{{ url_for('production.index') }}"><i class="bi bi-hammer"></i> To produce</a>
+      <a class="nav-link {{ 'active' if ep=='production.stock' }}" href="{{ url_for('production.stock') }}"><i class="bi bi-boxes"></i> Stock vs demand</a>
+      {% endif %}
+      {% if has_perm(current_user, 'view_reports') %}
+      {{ navgroup('Company') }}
+      {% if current_user.role == 'cfo' %}
+      <a class="nav-link {{ 'active' if ep.startswith('orders') }}" href="{{ url_for('orders.index') }}"><i class="bi bi-cart-check"></i> Orders</a>
+      <a class="nav-link {{ 'active' if ep.startswith('customers') and ep != 'customers.distributors' }}" href="{{ url_for('customers.index') }}"><i class="bi bi-person-vcard"></i> Customers</a>
+      <a class="nav-link {{ 'active' if ep.startswith('approvals') }}" href="{{ url_for('approvals.index') }}"><i class="bi bi-check2-square"></i> Approvals{% if approvals_pending %} <span class="badge badge-danger">{{ approvals_pending }}</span>{% endif %}</a>
+      <a class="nav-link {{ 'active' if ep.startswith('messages') }}" href="{{ url_for('messages.index') }}"><i class="bi bi-chat-dots"></i> Messages{% if staff_unread %} <span class="badge badge-danger">{{ staff_unread }}</span>{% endif %}</a>
+      {% endif %}
+      <a class="nav-link {{ 'active' if ep.startswith('reports') }}" href="{{ url_for('reports.index') }}"><i class="bi bi-bar-chart-line"></i> Sales reports</a>
+      <a class="nav-link {{ 'active' if ep.startswith('catalogue') }}" href="{{ url_for('catalogue.view') }}"><i class="bi bi-journal-text"></i> Catalogue</a>
+      {% endif %}
+      {% else %}
+      {# Generic staff nav (admin, manager, fulfilment, telesales, store roles,
+         accountant, finance viewer): grouped by module — dashboard, reports,
+         approvals, then the rest. Every link keeps its original permission
+         condition; only order and group headers changed. #}
+      <a class="nav-link {{ 'active' if ep.startswith('dashboard') }}" href="{{ url_for('dashboard.home') }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
+      {% if has_perm(current_user, 'view_reports') %}
+      {{ navgroup('Reports') }}
+      <a class="nav-link {{ 'active' if ep.startswith('reports') }}" href="{{ url_for('reports.index') }}"><i class="bi bi-bar-chart-line"></i> Reports</a>
+      <a class="nav-link {{ 'active' if ep=='crm.reports' }}" href="{{ url_for('crm.reports') }}"><i class="bi bi-clipboard-data"></i> CRM reports</a>
+      {% endif %}
+      {% if current_user.is_admin or current_user.is_pricing_officer or has_perm(current_user, 'manage_targets') %}
+      {{ navgroup('Approvals & targets') }}
+      {% if current_user.is_admin or current_user.is_pricing_officer %}
+      <a class="nav-link {{ 'active' if ep.startswith('approvals') }}" href="{{ url_for('approvals.index') }}"><i class="bi bi-check2-square"></i> {{ 'Approvals' if current_user.is_admin else 'My approvals' }}{% if approvals_pending %} <span class="badge badge-danger">{{ approvals_pending }}</span>{% endif %}</a>
+      {% endif %}
+      {% if has_perm(current_user, 'manage_targets') %}
+      <a class="nav-link {{ 'active' if ep.startswith('targets') }}" href="{{ url_for('targets.index') }}"><i class="bi bi-bullseye"></i> Rep targets</a>
+      {% endif %}
+      {% endif %}
+      {% if not current_user.is_store_manager and not current_user.is_stock_auditor
+            and current_user.role not in ['finance_clerk', 'cashier', 'finance_viewer'] %}
+      {{ navgroup('Sales') }}
+      {% if not current_user.is_telesales and not current_user.is_pricing_officer %}
+      <a class="nav-link {{ 'active' if ep.startswith('orders') }}" href="{{ url_for('orders.index') }}"><i class="bi bi-cart-check"></i> Orders</a>
+      {% endif %}
+      {% if not current_user.is_fulfilment_officer and not current_user.is_telesales %}
+      {% if not current_user.is_pricing_officer %}
+      <a class="nav-link {{ 'active' if ep.startswith('offers') }}" href="{{ url_for('offers.index') }}"><i class="bi bi-receipt"></i> Quotes</a>
+      {% endif %}
+      {% endif %}
+      {% if not current_user.is_fulfilment_officer %}
+      <a class="nav-link {{ 'active' if ep.startswith('customers') and ep not in ['customers.distributors','customers.onboarding_queue'] }}" href="{{ url_for('customers.index') }}"><i class="bi bi-person-vcard"></i> Customers</a>
+      <a class="nav-link {{ 'active' if ep=='customers.distributors' }}" href="{{ url_for('customers.distributors') }}"><i class="bi bi-truck"></i> Distributors</a>
+      {% if has_perm(current_user, 'manage_catalogue') %}
+      <a class="nav-link {{ 'active' if ep=='customers.onboarding_queue' }}" href="{{ url_for('customers.onboarding_queue') }}"><i class="bi bi-person-plus"></i> Onboarding{% if pending_onboarding %} <span class="badge badge-danger">{{ pending_onboarding }}</span>{% endif %}</a>
+      {% endif %}
+      {% endif %}
+      {% if has_perm(current_user, 'manage_catalogue') and not current_user.is_pricing_officer %}
+      <a class="nav-link {{ 'active' if ep.startswith('reps') }}" href="{{ url_for('reps.index') }}"><i class="bi bi-people-fill"></i> Reps</a>
+      {% endif %}
+      {% if not current_user.is_pricing_officer %}
+      <a class="nav-link {{ 'active' if ep.startswith('messages') }}" href="{{ url_for('messages.index') }}"><i class="bi bi-chat-dots"></i> Messages{% if staff_unread %} <span class="badge badge-danger">{{ staff_unread }}</span>{% endif %}</a>
+      {% endif %}
+      {% if has_perm(current_user, 'log_activity') %}
+      <a class="nav-link {{ 'active' if ep=='crm.follow_ups' }}" href="{{ url_for('crm.follow_ups') }}"><i class="bi bi-flag"></i> Follow-ups</a>
+      {% if features.pipeline %}<a class="nav-link {{ 'active' if ep=='crm.pipeline' }}" href="{{ url_for('crm.pipeline') }}"><i class="bi bi-kanban"></i> Pipeline</a>{% endif %}
+      {% if features.call_lists %}<a class="nav-link {{ 'active' if ep.startswith('crm.call_list') }}" href="{{ url_for('crm.call_lists') }}"><i class="bi bi-telephone-outbound"></i> Call lists</a>{% endif %}
+      {% endif %}
+      {{ navgroup('Pricing & catalogue') }}
+      {% if not current_user.is_fulfilment_officer and not current_user.is_telesales %}
+      <a class="nav-link {{ 'active' if ep.startswith('pricelists') or ep.startswith('customer_pricelists') }}" href="{{ url_for('pricelists.index') }}"><i class="bi bi-card-list"></i> Pricelists</a>
+      {% endif %}
+      {% if not current_user.is_fulfilment_officer and not current_user.is_telesales and not current_user.is_pricing_officer %}
+      <a class="nav-link {{ 'active' if ep.startswith('products') }}" href="{{ url_for('products.index') }}"><i class="bi bi-box-seam"></i> Products</a>
+      {% endif %}
+      {% if current_user.may_edit_prices or current_user.is_admin %}
+      <a class="nav-link {{ 'active' if ep.startswith('price_promos') }}" href="{{ url_for('price_promos.index') }}"><i class="bi bi-tag"></i> Promotions</a>
+      {% endif %}
+      {% if has_perm(current_user, 'manage_catalogue') and not current_user.is_pricing_officer %}
+      <a class="nav-link {{ 'active' if ep.startswith('promotions') }}" href="{{ url_for('promotions.index') }}"><i class="bi bi-megaphone"></i> Portal announcements</a>
+      {% endif %}
+      <a class="nav-link {{ 'active' if ep.startswith('catalogue') }}" href="{{ url_for('catalogue.view') }}"><i class="bi bi-journal-text"></i> Catalogue</a>
+      {% if current_user.may_edit_prices and not current_user.is_pricing_officer %}
+      <a class="nav-link {{ 'active' if ep.startswith('exchange_rates') }}" href="{{ url_for('exchange_rates.index') }}"><i class="bi bi-currency-exchange"></i> Exchange Rates</a>
+      {% endif %}
+      {% else %}
+      <a class="nav-link {{ 'active' if ep.startswith('catalogue') }}" href="{{ url_for('catalogue.view') }}"><i class="bi bi-journal-text"></i> Catalogue</a>
+      {% endif %}{# end not store_manager #}
+      {% if current_user.can_see_stock or has_perm(current_user, 'audit_stock') or has_perm(current_user, 'manage_stock') %}
+      {{ navgroup('Stock') }}
+      {% endif %}
+      {% if current_user.can_see_stock %}
+      <a class="nav-link {{ 'active' if ep=='stock.index' }}" href="{{ url_for('stock.index') }}"><i class="bi bi-boxes"></i> Stock</a>
+      <a class="nav-link {{ 'active' if ep.startswith('stock.store') }}" href="{{ url_for('stock.stores') }}"><i class="bi bi-shop"></i> Stores</a>
+      {% endif %}
+      {% if has_perm(current_user, 'audit_stock') or has_perm(current_user, 'manage_stock') %}
+      <a class="nav-link {{ 'active' if ep.startswith('stock.count') }}" href="{{ url_for('stock.counts') }}"><i class="bi bi-clipboard-check"></i> Stock takes</a>
+      <a class="nav-link {{ 'active' if ep=='stock.report_oos' }}" href="{{ url_for('stock.report_oos') }}"><i class="bi bi-exclamation-triangle"></i> Out-of-stock</a>
+      {% endif %}
+      {% endif %}{# end rep / other-roles nav #}
+      {% endif %}{# end ceo / other-roles nav #}
+      {# Module groups shared across roles, gated by capability. Finance roles
+         already carry these groups (accounting-first) in their own branch. #}
+      {% if has_perm(current_user, 'view_production') and not current_user.is_finance %}
+      {{ navgroup('Production') }}
+      <a class="nav-link {{ 'active' if ep in ['production.index','production.product_detail'] }}" href="{{ url_for('production.index') }}"><i class="bi bi-hammer"></i> To produce</a>
+      <a class="nav-link {{ 'active' if ep=='production.orders' }}" href="{{ url_for('production.orders') }}"><i class="bi bi-list-check"></i> Order coverage</a>
+      <a class="nav-link {{ 'active' if ep=='production.stock' }}" href="{{ url_for('production.stock') }}"><i class="bi bi-boxes"></i> Stock vs demand</a>
+      <a class="nav-link {{ 'active' if ep=='production.materials' }}" href="{{ url_for('production.materials') }}"><i class="bi bi-basket"></i> Raw materials</a>
+      <a class="nav-link {{ 'active' if ep=='production.recipes' }}" href="{{ url_for('production.recipes') }}"><i class="bi bi-link-45deg"></i> Recipe links</a>
+      {% endif %}
+      {% if has_perm(current_user, 'view_costing') and not current_user.is_finance %}
+      {{ navgroup('Costing') }}
+      <a class="nav-link {{ 'active' if ep.startswith('summary.') }}" href="{{ url_for('summary.dashboard') }}"><i class="bi bi-speedometer"></i> Cost dashboard</a>
+      <a class="nav-link {{ 'active' if ep.startswith('recipes.') }}" href="{{ url_for('recipes.index') }}"><i class="bi bi-card-checklist"></i> Recipes</a>
+      <a class="nav-link {{ 'active' if ep.startswith('ingredients.') }}" href="{{ url_for('ingredients.index') }}"><i class="bi bi-basket2"></i> Ingredients</a>
+      <a class="nav-link {{ 'active' if ep.startswith('cuts.') }}" href="{{ url_for('cuts.index') }}"><i class="bi bi-scissors"></i> Carcass cuts</a>
+      <a class="nav-link {{ 'active' if ep.startswith('spice_mixes.') }}" href="{{ url_for('spice_mixes.index') }}"><i class="bi bi-stars"></i> Spice mixes</a>
+      <a class="nav-link {{ 'active' if ep.startswith('pricing.') }}" href="{{ url_for('pricing.index') }}"><i class="bi bi-tags"></i> Cost pricing</a>
+      <a class="nav-link {{ 'active' if ep.startswith('whatif.') }}" href="{{ url_for('whatif.index') }}"><i class="bi bi-graph-up-arrow"></i> What-if</a>
+      {% if has_perm(current_user, 'edit_costing') %}
+      <a class="nav-link {{ 'active' if ep.startswith('overhead.') }}" href="{{ url_for('overhead.index') }}"><i class="bi bi-lightning-charge"></i> Overhead</a>
+      <a class="nav-link {{ 'active' if ep.startswith('packaging.') }}" href="{{ url_for('packaging.index') }}"><i class="bi bi-box2"></i> Packaging costs</a>
+      <a class="nav-link {{ 'active' if ep.startswith('settings.') }}" href="{{ url_for('settings.index') }}"><i class="bi bi-gear"></i> Costing settings</a>
+      {% endif %}
+      {% endif %}
+      {% if (has_perm(current_user, 'view_accounting') or has_perm(current_user, 'record_receipts'))
+            and not current_user.is_finance %}
+      {{ navgroup('Accounting') }}
+      {% if has_perm(current_user, 'record_receipts') %}
+      <a class="nav-link {{ 'active' if ep.startswith('accounting.receipt') }}" href="{{ url_for('accounting.receipts') }}"><i class="bi bi-cash-coin"></i> Receipts</a>
+      {% endif %}
+      {% if has_perm(current_user, 'view_accounting') %}
+      <a class="nav-link {{ 'active' if ep.startswith('accounting.journal') }}" href="{{ url_for('accounting.journal') }}"><i class="bi bi-journal-bookmark"></i> Journal</a>
+      <a class="nav-link {{ 'active' if ep.startswith('accounting.shop') }}" href="{{ url_for('accounting.shops') }}"><i class="bi bi-shop-window"></i> Shops</a>
+      <a class="nav-link {{ 'active' if ep.startswith('accounting.invoice') }}" href="{{ url_for('accounting.invoices') }}"><i class="bi bi-receipt-cutoff"></i> Invoices</a>
+      <a class="nav-link {{ 'active' if ep.startswith('accounting.purchase') }}" href="{{ url_for('accounting.purchases') }}"><i class="bi bi-bag"></i> Purchases</a>
+      <a class="nav-link {{ 'active' if ep.startswith('accounting.payment') }}" href="{{ url_for('accounting.payments') }}"><i class="bi bi-cash-stack"></i> Payments</a>
+      <a class="nav-link {{ 'active' if ep.startswith('accounting.supplier') }}" href="{{ url_for('accounting.suppliers') }}"><i class="bi bi-truck-flatbed"></i> Suppliers</a>
+      <a class="nav-link {{ 'active' if ep.startswith('accounting.cash_bank') or ep.startswith('accounting.reconcile') }}" href="{{ url_for('accounting.cash_bank') }}"><i class="bi bi-bank"></i> Cash &amp; bank</a>
+      <a class="nav-link {{ 'active' if ep.startswith('accounting.inventory') }}" href="{{ url_for('accounting.inventory') }}"><i class="bi bi-box-seam"></i> Inventory</a>
+      <a class="nav-link {{ 'active' if ep.startswith('accounting.report') or ep=='accounting.fin_reports' }}" href="{{ url_for('accounting.fin_reports') }}"><i class="bi bi-file-earmark-bar-graph"></i> Financial reports</a>
+      <a class="nav-link {{ 'active' if ep=='accounting.accounts' }}" href="{{ url_for('accounting.accounts') }}"><i class="bi bi-list-columns"></i> Accounts</a>
+      <a class="nav-link {{ 'active' if ep=='accounting.trial_balance' }}" href="{{ url_for('accounting.trial_balance') }}"><i class="bi bi-check2-square"></i> Trial balance</a>
+      {% endif %}
+      {% endif %}
+      {% if current_user.is_admin %}
+      {{ navgroup('Administration') }}
+      <a class="nav-link {{ 'active' if ep.startswith('admin') }}" href="{{ url_for('admin.users') }}"><i class="bi bi-shield-lock"></i> Admin</a>
+      {% endif %}
+    </nav>
+    <div class="rf-sb-foot">{{ app_name }}<br>{{ company_name }}</div>
+  </aside>
+
+  <div class="rf-main">
+    <div class="rf-topbar">
+      <button class="btn btn-sm btn-dark d-md-none" onclick="document.getElementById('rfSidebar').classList.toggle('open')"><i class="bi bi-list"></i></button>
+      <div class="fw-semibold rf-head">{% block heading %}{% endblock %}</div>
+      <div class="rf-user d-flex align-items-center gap-3">
+        <span><i class="bi bi-person-circle"></i> {{ current_user.full_name }}
+          <span class="badge bg-secondary text-uppercase">{{ current_user.role }}</span>
+          {% if current_user.may_edit_prices %}<span class="badge" style="background:var(--rf-orange)">edit</span>{% endif %}
+        </span>
+        <a class="text-decoration-none" href="{{ url_for('auth.account') }}" title="My account"><i class="bi bi-gear"></i></a>
+        <a class="btn btn-sm btn-outline-dark" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right"></i> Logout</a>
+      </div>
+    </div>
+    <main class="rf-content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% else %}
+  {% block fullpage %}{% endblock %}
+{% endif %}
+
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="toast align-items-center text-bg-{{ 'danger' if category=='danger' else 'success' if category=='success' else 'warning' if category=='warning' else 'secondary' }} border-0 show" role="alert">
+      <div class="d-flex">
+        <div class="toast-body">{{ message }}</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>
+    </div>
+    {% endfor %}
+  {% endwith %}
+</div>
+
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+<script>
+  document.querySelectorAll('.toast').forEach(function(t){
+    setTimeout(function(){ try{ bootstrap.Toast.getOrCreateInstance(t).hide(); }catch(e){} }, 4500);
+  });
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

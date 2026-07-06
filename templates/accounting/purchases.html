@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block heading %}Purchases & expenses{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-end mb-3">
+  {% if can_record %}
+  <a class="btn btn-primary" href="{{ url_for('accounting.purchase_new') }}"><i class="bi bi-plus-lg"></i> Record purchase / expense</a>
+  {% endif %}
+</div>
+<div class="table-responsive rf-card">
+<table class="table table-sm table-hover align-middle mb-0">
+  <thead><tr><th>No</th><th>Date</th><th>Supplier</th><th>Ref</th>
+    <th class="text-end">Net</th><th class="text-end">VAT in</th><th class="text-end">Gross</th>
+    <th>Settled</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for p in purchases %}
+    <tr onclick="window.location='{{ url_for('accounting.purchase_view', pid=p.id) }}'" style="cursor:pointer"
+        class="{{ 'text-muted' if p.status == 'reversed' }}">
+      <td class="fw-semibold">{{ p.purchase_no }}</td>
+      <td class="small">{{ p.purchase_date.strftime('%d %b %Y') }}</td>
+      <td class="small">{{ p.supplier.name }}</td>
+      <td class="small">{{ p.bill_ref or '—' }}</td>
+      <td class="text-end">{{ '{:,}'.format(p.net_minor) }}</td>
+      <td class="text-end">{{ '{:,}'.format(p.vat_minor) }}</td>
+      <td class="text-end fw-semibold">{{ '{:,}'.format(p.gross_minor) }}</td>
+      <td class="small">{{ p.PAY_FROM.get(p.pay_from) }}</td>
+      <td>{% if p.status == 'reversed' %}<span class="badge badge-danger">Reversed</span>
+          {% else %}<span class="badge badge-ok">Posted</span>{% endif %}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="9" class="text-center text-muted py-4">No purchases recorded yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% if pages > 1 %}
+<nav class="mt-3"><ul class="pagination pagination-sm">
+  {% for pg in range(1, pages + 1) %}
+  <li class="page-item {{ 'active' if pg==page }}"><a class="page-link" href="{{ url_for('accounting.purchases', page=pg) }}">{{ pg }}</a></li>
+  {% endfor %}
+</ul></nav>
+{% endif %}
+{% endblock %}

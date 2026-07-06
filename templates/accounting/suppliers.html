@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block heading %}Suppliers{% endblock %}
+{% block content %}
+{% if can_edit %}
+<div class="rf-card p-3 mb-3">
+  <form method="post" action="{{ url_for('accounting.supplier_create') }}" class="row g-2 align-items-end">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="col-md-3"><label class="form-label small">Name</label>
+      <input class="form-control form-control-sm" name="name" required></div>
+    <div class="col-md-2"><label class="form-label small">TIN</label>
+      <input class="form-control form-control-sm" name="tin"></div>
+    <div class="col-md-2"><label class="form-label small">Phone</label>
+      <input class="form-control form-control-sm" name="phone"></div>
+    <div class="col-md-2"><label class="form-label small">Terms</label>
+      <input class="form-control form-control-sm" name="payment_terms" placeholder="cash / 14 days"></div>
+    <div class="col-auto form-check mb-1 ms-2">
+      <input class="form-check-input" type="checkbox" name="vat_registered" value="1" id="vr">
+      <label class="form-check-label small" for="vr">VAT-registered</label></div>
+    <div class="col-auto"><button class="btn btn-sm btn-primary">Add supplier</button></div>
+  </form>
+</div>
+{% endif %}
+
+<div class="table-responsive rf-card">
+<table class="table table-sm table-hover align-middle mb-0">
+  <thead><tr><th>Supplier</th><th>TIN</th><th>Phone</th><th>Terms</th><th>VAT</th>
+    <th class="text-end">Balance owed (UGX)</th><th></th></tr></thead>
+  <tbody>
+  {% for s in suppliers %}
+    <tr class="{{ 'text-muted' if not s.active }}">
+      <td class="fw-semibold">{{ s.name }}</td>
+      <td class="small">{{ s.tin or '—' }}</td>
+      <td class="small">{{ s.phone or '—' }}</td>
+      <td class="small">{{ s.payment_terms or '—' }}</td>
+      <td class="small">{{ 'Yes' if s.vat_registered else '' }}</td>
+      <td class="text-end fw-semibold">{{ '{:,}'.format(s.balance_minor) }}</td>
+      <td class="text-end">
+        {% if can_edit %}
+        <button class="btn btn-sm btn-outline-secondary py-0 px-1" type="button"
+                data-bs-toggle="collapse" data-bs-target="#edit{{ s.id }}"><i class="bi bi-pencil"></i></button>
+        {% endif %}
+      </td>
+    </tr>
+    {% if can_edit %}
+    <tr class="collapse" id="edit{{ s.id }}"><td colspan="7">
+      <form method="post" action="{{ url_for('accounting.supplier_edit', sid=s.id) }}" class="d-flex gap-2 flex-wrap p-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input class="form-control form-control-sm" name="name" value="{{ s.name }}" style="width:180px">
+        <input class="form-control form-control-sm" name="tin" value="{{ s.tin or '' }}" placeholder="TIN" style="width:130px">
+        <input class="form-control form-control-sm" name="phone" value="{{ s.phone or '' }}" placeholder="phone" style="width:130px">
+        <input class="form-control form-control-sm" name="payment_terms" value="{{ s.payment_terms or '' }}" placeholder="terms" style="width:110px">
+        <label class="small align-self-center"><input type="checkbox" name="vat_registered" value="1" {{ 'checked' if s.vat_registered }}> VAT</label>
+        <label class="small align-self-center"><input type="checkbox" name="active" value="1" {{ 'checked' if s.active }} onchange="this.form.querySelector('[name=active_flag]').value=this.checked?'1':'0'"> active</label>
+        <input type="hidden" name="active_flag" value="{{ '1' if s.active else '0' }}">
+        <button class="btn btn-sm btn-primary py-0 px-2">Save</button>
+      </form>
+    </td></tr>
+    {% endif %}
+  {% else %}
+    <tr><td colspan="7" class="text-center text-muted py-4">No suppliers yet. Add the livestock and carcass suppliers first — stock buys need them.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="small text-muted mt-2">Balance owed counts posted on-account purchases
+minus payments. Payments arrive with the cash &amp; bank module (Phase 5).</p>
+{% endblock %}

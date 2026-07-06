@@ -1,0 +1,94 @@
+{% extends "costing/_shell.html" %}
+{% block heading %}Dashboard{% endblock %}
+{% block costing_content %}
+<div class="page-head">
+  <h1>Product Summary</h1>
+  <div class="spacer"></div>
+  <a class="btn btn-sm btn-outline-success" href="{{ url_for('summary.export_excel', show='all' if show_all else none, category=cat_id) }}"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+  <a class="btn btn-sm btn-outline-danger" href="{{ url_for('summary.export_pdf', show='all' if show_all else none, category=cat_id) }}"><i class="bi bi-file-earmark-pdf"></i> PDF Price List</a>
+</div>
+
+<div class="stat-cards">
+  <div class="stat-card"><div class="label">Active Products</div><div class="value">{{ active_count }}</div></div>
+  <div class="stat-card"><div class="label">Total Recipes</div><div class="value">{{ total_count }}</div></div>
+  <div class="stat-card"><div class="label">Below {{ low|int }}% Margin</div><div class="value">{{ below }}</div></div>
+  <div class="stat-card"><div class="label">Showing</div><div class="value" id="showingCount">{{ rows|length }}</div></div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <form class="row g-2 align-items-end mb-3" method="get" onsubmit="return false">
+      <div class="col-auto">
+        <label class="form-label mb-0 small">Search</label>
+        <input type="search" id="dashSearch" class="form-control form-control-sm" placeholder="Type a product name…" style="width:240px" autofocus autocomplete="off">
+      </div>
+      <div class="col-auto">
+        <label class="form-label mb-0 small">Category</label>
+        <select name="category" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">All categories</option>
+          {% for c in categories %}
+          <option value="{{ c.id }}" {{ 'selected' if cat_id==c.id }}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="showAll" name="show" value="all" {{ 'checked' if show_all }} onchange="this.form.submit()">
+          <label class="form-check-label small" for="showAll">Show all (incl. inactive)</label>
+        </div>
+      </div>
+      <div class="col text-end small text-muted">
+        Wholesale and RRP prices are on the <a href="{{ url_for('pricing.index') }}">Pricing</a> page.
+      </div>
+    </form>
+
+    <div class="table-responsive">
+      <table class="table table-hover align-middle" id="prodTable">
+        <thead>
+          <tr>
+            <th>Product</th><th>Category</th><th>Status</th>
+            {% if not hide_costs %}<th class="num">Cost/kg</th>{% endif %}
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr class="{{ 'row-inactive' if r.status=='inactive' }}" data-search="{{ (r.name ~ ' ' ~ r.category)|lower }}">
+            <td><a href="{{ url_for('recipes.view', rid=r.recipe.id) }}" class="text-decoration-none fw-semibold">{{ r.name }}</a></td>
+            <td><span class="text-muted small">{{ r.category }}</span></td>
+            <td>{% if r.status=='inactive' %}<span class="badge bg-secondary">Inactive</span>{% else %}<span class="badge bg-success">Active</span>{% endif %}</td>
+            {% if not hide_costs %}<td class="num">{{ r.cost|money }}</td>{% endif %}
+            <td><a class="btn btn-sm btn-outline-secondary py-0" href="{{ url_for('pricing.detail', rid=r.recipe.id) }}" title="View pricing"><i class="bi bi-tags"></i></a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tbody id="noResults" style="display:none">
+          <tr><td colspan="6" class="text-center text-muted py-4">No products match your search.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  const search = document.getElementById('dashSearch');
+  const rows = [...document.querySelectorAll('#prodTable tbody:first-of-type tr')];
+  const showing = document.getElementById('showingCount');
+  const noResults = document.getElementById('noResults');
+  function apply() {
+    const q = search.value.trim().toLowerCase();
+    let n = 0;
+    rows.forEach(tr => {
+      const hit = !q || tr.dataset.search.includes(q);
+      tr.style.display = hit ? '' : 'none';
+      if (hit) n++;
+    });
+    if (showing) showing.textContent = n;
+    if (noResults) noResults.style.display = n === 0 ? '' : 'none';
+  }
+  search.addEventListener('input', apply);
+})();
+</script>
+{% endblock %}

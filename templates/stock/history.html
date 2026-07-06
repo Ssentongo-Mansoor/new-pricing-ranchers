@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block heading %}Stock history{% endblock %}
+{% block content %}
+<a class="small" href="{{ url_for('stock.index') }}">← All stock</a>
+<div class="rf-card p-3 my-2">
+  <h2 class="h6 mb-1">{{ product.article_no }} — {{ product.description }}</h2>
+  <div>On hand now: <strong>{{ '%g'|format(product.stock_on_hand or 0) }} {{ product.unit_of_measure or '' }}</strong></div>
+</div>
+<div class="table-responsive rf-card">
+<table class="table table-sm align-middle mb-0">
+  <thead><tr><th>When</th><th>Type</th><th class="text-end">Change</th><th class="text-end">Balance</th><th>Lot</th><th>Expiry</th><th>By</th><th>Note</th></tr></thead>
+  <tbody>
+  {% for m in moves %}
+    <tr>
+      <td class="small">{{ m.created_at.strftime('%d %b %Y %H:%M') }}</td>
+      <td>{{ m.kind_label }}</td>
+      <td class="text-end {{ 'text-success' if m.qty > 0 else 'text-danger' }}">{{ '%+g'|format(m.qty) }}</td>
+      <td class="text-end">{{ '%g'|format(m.balance_after) if m.balance_after is not none else '—' }}</td>
+      <td class="small">{{ m.lot_number or '—' }}</td>
+      <td class="small">{{ m.expiry.strftime('%d %b %Y') if m.expiry else '—' }}</td>
+      <td class="small">{{ m.user.full_name if m.user else '—' }}</td>
+      <td class="small">{{ m.note or '' }}{% if m.order_id %} <a href="{{ url_for('orders.detail', order_id=m.order_id) }}">order</a>{% endif %}</td>
+    </tr>
+  {% else %}<tr><td colspan="8" class="text-center text-muted py-4">No movements yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

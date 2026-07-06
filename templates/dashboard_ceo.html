@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% block heading %}Executive overview{% endblock %}
+
+{% macro ugx(v) %}UGX {{ '{:,.0f}'.format(v or 0) }}{% endmacro %}
+{% macro delta(p) %}
+  {% if p is none %}<span class="text-muted small">no prior data</span>
+  {% elif p >= 0 %}<span class="small fw-semibold" style="color:#2E7D32">▲ {{ '%.0f'|format(p) }}% vs prior</span>
+  {% else %}<span class="small fw-semibold" style="color:#ED1C24">▼ {{ '%.0f'|format(-p) }}% vs prior</span>{% endif %}
+{% endmacro %}
+
+{% block content %}
+<div class="rf-hero">
+  <img class="rf-hero-logo" src="{{ url_for('static', filename='img/ranchers-logo.svg') }}" alt="">
+  {% set hr = now.hour %}
+  <h1>{{ 'Good morning' if hr < 12 else 'Good afternoon' if hr < 17 else 'Good evening' }}, {{ current_user.full_name.split(' ')[0] }}</h1>
+  <div class="sub">{{ today.strftime('%A %d %B %Y') }} · how the business is performing. Figures in UGX equivalent.</div>
+</div>
+
+<!-- Revenue tiles -->
+<div class="row g-3 mb-1">
+  <div class="col-md-4">
+    <div class="rf-card p-3 h-100">
+      <div class="text-muted small text-uppercase">This month · {{ rev.mtd_label }}</div>
+      <div class="h3 mb-1" style="color:#F47A21">{{ ugx(rev.this_month) }}</div>
+      {{ delta(deltas.mtd) }}
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="rf-card p-3 h-100">
+      <div class="text-muted small text-uppercase">Last month</div>
+      <div class="h3 mb-1" style="color:#6E7149">{{ ugx(rev.last_month) }}</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="rf-card p-3 h-100">
+      <div class="text-muted small text-uppercase">This year ({{ rev.year }})</div>
+      <div class="h3 mb-1" style="color:#2B2B2B">{{ ugx(rev.this_year) }}</div>
+      <span class="small text-muted">outstanding: {{ ugx(outstanding_total) }}</span>
+    </div>
+  </div>
+</div>
+
+<!-- Operational tiles -->
+<div class="rf-kpis mb-3" style="grid-template-columns:repeat(5,1fr)">
+  <a href="{{ url_for('orders.index') }}"><div class="rf-kpi"><div class="num" style="color:#6E7149">{{ risk.active }}</div><div class="lbl">Active orders</div></div></a>
+  <a href="{{ url_for('orders.index') }}"><div class="rf-kpi"><div class="num" style="color:#ED1C24">{{ risk.delayed }}</div><div class="lbl">Delayed</div></div></a>
+  <a href="{{ url_for('stock.report_oos') }}"><div class="rf-kpi"><div class="num" style="color:#ED1C24">{{ risk.oos }}</div><div class="lbl">Out of stock</div></div></a>
+  <a href="{{ url_for('stock.index') }}"><div class="rf-kpi"><div class="num" style="color:#F9A03F">{{ risk.low }}</div><div class="lbl">Low stock</div></div></a>
+  <a href="{{ url_for('customers.index') }}"><div class="rf-kpi"><div class="num">{{ risk.new_customers }}</div><div class="lbl">New customers (MTD)</div></div></a>
+</div>
+
+<!-- Trend + channel mix -->
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="rf-card p-3 h-100">
+      <h2 class="h6"><i class="bi bi-graph-up-arrow text-rf-orange"></i>
+        {% if chart_mode == 'mtd' %}Revenue — month to date ({{ rev.mtd_label }}) <span class="text-muted small fw-normal">· live, cumulative</span>
+        {% else %}Revenue — recent months <span class="text-muted small fw-normal">· {{ rev.mtd_label }} so far (switches to daily once live)</span>{% endif %}</h2>
+      <canvas id="trendChart" height="110"></canvas>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="rf-card p-3 h-100">
+      <h2 class="h6"><i class="bi bi-pie-chart text-rf-orange"></i> Sales by channel (MTD)</h2>
+      {% if channel_labels %}<canvas id="channelChart" height="220"></canvas>
+      {% else %}<p class="text-muted small mt-3">No sales booked this month yet.</p>{% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Leaders -->
+<div class="row g-3 mt-0">
+  <div class="col-lg-4">
+    <div class="rf-card p-3 h-100">
+      <h2 class="h6"><i class="bi bi-star text-rf-orange"></i> Top customers <span class="text-muted small fw-normal">(90 days)</span></h2>
+      <table class="table table-sm align-middle mb-0">
+        <tbody>
+        {% for name, val in top_customers %}
+          <tr><td class="fw-semibold">{{ loop.index }}. {{ name }}</td><td class="text-end money">{{ ugx(val) }}</td></tr>
+        {% else %}<tr><td class="text-muted">No data yet.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="rf-card p-3 h-100">
+      <h2 class="h6"><i class="bi bi-people-fill text-rf-orange"></i> Rep leaderboard <span class="text-muted small fw-normal">(90 days)</span></h2>
+      <table class="table table-sm align-middle mb-0">
+        <tbody>
+        {% for name, val in rep_leaders %}
+          <tr><td class="fw-semibold">{{ loop.index }}. {{ name }}</td><td class="text-end money">{{ ugx(val) }}</td></tr>
+        {% else %}<tr><td class="text-muted">No data yet.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="rf-card p-3 h-100">
+      <h2 class="h6"><i class="bi bi-box-seam text-rf-orange"></i> Top products <span class="text-muted small fw-normal">(90 days)</span></h2>
+      <table class="table table-sm align-middle mb-0">
+        <tbody>
+        {% for name, val in top_products %}
+          <tr><td class="fw-semibold">{{ loop.index }}. {{ name }}</td><td class="text-end money">{{ ugx(val) }}</td></tr>
+        {% else %}<tr><td class="text-muted">No data yet.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Distributors -->
+<div class="row g-3 mt-0">
+  <div class="col-lg-4">
+    <div class="rf-card p-3 h-100">
+      <div class="text-muted small text-uppercase">Distributor sales (MTD)</div>
+      <div class="h4 mb-1" style="color:#6E7149">{{ ugx(dist_mtd) }}</div>
+      <div class="small text-muted">
+        {% set tot = dist_mtd + direct_mtd %}
+        {% if tot %}{{ '%.0f'|format(dist_mtd / tot * 100) }}% of this month’s sales{% else %}no sales yet this month{% endif %}
+      </div>
+      <hr class="my-2">
+      <div class="text-muted small text-uppercase">Direct customer sales (MTD)</div>
+      <div class="h5 mb-0" style="color:#2B2B2B">{{ ugx(direct_mtd) }}</div>
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="rf-card p-3 h-100">
+      <h2 class="h6"><i class="bi bi-truck text-rf-orange"></i> Top distributors <span class="text-muted small fw-normal">(90 days)</span></h2>
+      <table class="table table-sm align-middle mb-0">
+        <tbody>
+        {% for name, val in top_distributors %}
+          <tr><td class="fw-semibold">{{ loop.index }}. {{ name }}</td><td class="text-end money">{{ ugx(val) }}</td></tr>
+        {% else %}<tr><td class="text-muted">No distributor sales in this period.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Customer feedback -->
+<div class="row g-3 mt-0">
+  <div class="col-lg-4">
+    <div class="rf-card p-3 h-100 text-center">
+      <div class="text-muted small text-uppercase">Avg delivery rating (90d)</div>
+      <div class="h2 mb-0" style="color:#F9A03F">
+        {% if risk.avg_rating is none %}—{% else %}{{ risk.avg_rating }} <span style="font-size:1rem">/ 5</span>{% endif %}</div>
+      <div style="color:#F9A03F; font-size:1.2rem; letter-spacing:2px">
+        {% if risk.avg_rating %}{% for n in range(1,6) %}{{ '★' if n <= (risk.avg_rating|round(0,'common')|int) else '☆' }}{% endfor %}{% endif %}</div>
+      <div class="small text-muted mt-1">{{ risk.n_rated }} rated ·
+        {% if risk.low_rated %}<a href="{{ url_for('reports.feedback') }}" class="text-danger">{{ risk.low_rated }} poor</a>{% else %}0 poor{% endif %}</div>
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="rf-card p-3 h-100">
+      <h2 class="h6 d-flex justify-content-between"><span><i class="bi bi-chat-quote text-rf-orange"></i> Recent customer feedback</span>
+        <a class="small" href="{{ url_for('reports.feedback') }}">Full report</a></h2>
+      <ul class="list-group list-group-flush mb-0">
+        {% for o in recent_comments %}
+        <li class="list-group-item px-0 py-2">
+          <span style="color:#F9A03F">{% for n in range(1,6) %}{{ '★' if n <= o.rating else '☆' }}{% endfor %}</span>
+          <span class="small text-muted">· {{ o.customer.name }} · {{ o.number }}</span>
+          <div class="small">“{{ o.rating_comment }}”</div>
+        </li>
+        {% else %}<li class="list-group-item px-0 text-muted small">No written feedback yet.</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Risk & health -->
+<div class="row g-3 mt-0">
+  <div class="col-md-3">
+    <div class="rf-card p-3 h-100">
+      <div class="text-muted small text-uppercase">Credit exposure</div>
+      <div class="h5 mb-0" style="color:#ED1C24">{{ ugx(risk.credit_exposure) }}</div>
+      <div class="small text-muted">undelivered orders on credit terms</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="rf-card p-3 h-100">
+      <div class="text-muted small text-uppercase">Accounts on hold</div>
+      <div class="h5 mb-0">{{ risk.on_hold }}</div>
+      <div class="small text-muted"><a href="{{ url_for('customers.index') }}">review customers</a></div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="rf-card p-3 h-100">
+      <div class="text-muted small text-uppercase">Quote conversion</div>
+      <div class="h5 mb-0">{% if risk.conv_rate is none %}—{% else %}{{ '%.0f'|format(risk.conv_rate) }}%{% endif %}</div>
+      <div class="small text-muted">{{ risk.won }} of {{ risk.decided }} decided (90 days)</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="rf-card p-3 h-100">
+      <div class="text-muted small text-uppercase">Customers</div>
+      <div class="h5 mb-0">{{ '{:,}'.format(n_customers) }}</div>
+      <div class="small text-muted">active accounts</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script>
+const RF = {orange:'#F47A21', olive:'#6E7149', red:'#ED1C24', dark:'#2B2B2B', amber:'#F9A03F', green:'#2E7D32'};
+const PALETTE = [RF.orange, RF.olive, RF.green, RF.amber, RF.red, RF.dark, '#8D6E63', '#4E7CA1'];
+const ugxTick = v => 'UGX ' + Number(v).toLocaleString();
+
+(function(){
+  const ctx = document.getElementById('trendChart');
+  if (!ctx) return;
+  const vals = {{ chart_values|tojson }};
+  const mode = "{{ chart_mode }}";
+  const ds = (mode === 'months')
+    ? { type:'bar', data: vals, borderRadius:4,
+        backgroundColor: vals.map((_,i)=> i===vals.length-1 ? RF.orange : '#e7d9c6') }
+    : { type:'line', data: vals, borderColor: RF.orange,
+        backgroundColor:'rgba(244,122,33,0.12)', fill:true, tension:0.3, pointRadius:0, borderWidth:2 };
+  new Chart(ctx, {
+    data: { labels: {{ chart_labels|tojson }}, datasets: [Object.assign({label:'Revenue (UGX)'}, ds)] },
+    options: {
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: c => ugxTick(c.parsed.y) } } },
+      scales: { x: { ticks: { maxTicksLimit: 9, autoSkip: true } },
+        y: { ticks: { callback: ugxTick } } }
+    }
+  });
+})();
+
+(function(){
+  const ctx = document.getElementById('channelChart');
+  if (!ctx) return;
+  new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: {{ channel_labels|tojson }},
+      datasets: [{ data: {{ channel_values|tojson }}, backgroundColor: PALETTE }]
+    },
+    options: { plugins: { legend: { position: 'bottom' },
+      tooltip: { callbacks: { label: c => c.label + ': ' + ugxTick(c.parsed) } } } }
+  });
+})();
+
+</script>
+{% endblock %}

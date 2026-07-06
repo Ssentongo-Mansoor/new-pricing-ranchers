@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block heading %}New quote{% endblock %}
+{% block content %}
+<div class="rf-card p-4" style="max-width:680px">
+  <form method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="mb-3"><label class="form-label">Customer</label>
+      <select class="form-select" name="customer_id" id="customerSel" required>
+        <option value="">Choose…</option>
+        {% for c in customers %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+      </select></div>
+    <div class="mb-3"><label class="form-label">Price from list</label>
+      <select class="form-select" name="source_id" id="sourceSel" required disabled>
+        <option value="">Choose a customer first…</option>
+        {% for p in lists %}<option value="{{ p.id }}" hidden>{{ p.name }} ({{ p.currency }}){{ ' · customer' if p.is_customer }}</option>{% endfor %}
+      </select>
+      <div class="form-text">Only the pricelists allocated to the chosen customer are shown.</div></div>
+    <div class="row">
+      <div class="col-md-4 mb-3"><label class="form-label">Quote currency</label>
+        <select class="form-select" name="currency"><option>UGX</option><option>USD</option></select></div>
+      <div class="col-md-4 mb-3"><label class="form-label">Market</label>
+        <select class="form-select" name="market">
+          <option value="local">Local (VAT 18%)</option>
+          <option value="export">Export (zero-rated)</option>
+        </select></div>
+      <div class="col-md-4 mb-3"><label class="form-label">Valid until</label>
+        <input class="form-control" type="date" name="valid_until"></div>
+    </div>
+    <div class="mb-3"><label class="form-label">Notes</label>
+      <textarea class="form-control" name="notes" rows="2"></textarea></div>
+    <p class="small text-muted">For a USD quote, the UGX→USD rate in force is stamped onto the quote so it stays fixed once issued.</p>
+    <button class="btn btn-primary">Start quote</button>
+    <a class="btn btn-link" href="{{ url_for('offers.index') }}">Cancel</a>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const alloc = {{ alloc_map|tojson }};
+const custSel = document.getElementById('customerSel');
+const srcSel = document.getElementById('sourceSel');
+function filterLists(){
+  const cid = custSel.value;
+  const allowed = alloc[cid] || [];
+  let shown = 0;
+  Array.from(srcSel.options).forEach(function(o){
+    if(!o.value){ return; }
+    const ok = allowed.indexOf(parseInt(o.value)) !== -1;
+    o.hidden = !ok; o.disabled = !ok; if(ok) shown++;
+  });
+  srcSel.value = ""; srcSel.disabled = !cid;
+  srcSel.options[0].textContent = cid ? (shown ? "Choose…" : "No pricelists allocated to this customer") : "Choose a customer first…";
+}
+custSel.addEventListener('change', filterLists);
+filterLists();
+</script>
+{% endblock %}

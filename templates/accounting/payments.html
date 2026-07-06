@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block heading %}Supplier payments{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-end mb-3">
+  {% if can_pay %}
+  <a class="btn btn-primary" href="{{ url_for('accounting.payment_new') }}"><i class="bi bi-cash-stack"></i> Pay a supplier</a>
+  {% endif %}
+</div>
+<div class="table-responsive rf-card">
+<table class="table table-sm table-hover align-middle mb-0">
+  <thead><tr><th>No</th><th>Date</th><th>Supplier</th><th>Method</th>
+    <th class="text-end">Amount (UGX)</th><th>Bills settled</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for p in payments %}
+    <tr class="{{ 'text-muted' if p.status == 'reversed' }}">
+      <td class="fw-semibold">{{ p.payment_no }}</td>
+      <td class="small">{{ p.payment_date.strftime('%d %b %Y') }}</td>
+      <td class="small">{{ p.supplier.name }}</td>
+      <td class="small">{{ p.method|replace('_',' ')|title }}</td>
+      <td class="text-end">{{ '{:,}'.format(p.amount_minor) }}</td>
+      <td class="small">
+        {% for a in p.allocations %}<a href="{{ url_for('accounting.purchase_view', pid=a.purchase_id) }}">{{ a.purchase.purchase_no }}</a> ({{ '{:,}'.format(a.amount_minor) }}){{ ', ' if not loop.last }}{% endfor %}
+      </td>
+      <td><span class="badge badge-ok">Posted</span></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="7" class="text-center text-muted py-4">No supplier payments yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% if pages > 1 %}
+<nav class="mt-3"><ul class="pagination pagination-sm">
+  {% for pg in range(1, pages + 1) %}
+  <li class="page-item {{ 'active' if pg==page }}"><a class="page-link" href="{{ url_for('accounting.payments', page=pg) }}">{{ pg }}</a></li>
+  {% endfor %}
+</ul></nav>
+{% endif %}
+{% endblock %}

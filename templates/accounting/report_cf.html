@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block heading %}Cash flow{% endblock %}
+{% block content %}
+{% include "accounting/_tb_badge.html" %}
+{% include "accounting/_period_form.html" %}
+
+<div class="rf-card p-3">
+<table class="table table-sm mb-0"><tbody>
+  <tr class="fw-semibold"><td>Opening money (cash + bank + MoMo)</td>
+    <td class="text-end">{{ '{:,}'.format(r.opening) }}</td></tr>
+  {% for label, v in r.flows %}
+  <tr><td class="ps-4 {{ 'text-danger' if v < 0 }}">{{ label }}</td>
+    <td class="text-end {{ 'text-danger' if v < 0 }}">{{ '{:,}'.format(v) }}</td></tr>
+  {% endfor %}
+  <tr class="border-top"><td class="ps-4">Total in</td><td class="text-end">{{ '{:,}'.format(r.inflow) }}</td></tr>
+  <tr><td class="ps-4">Total out</td><td class="text-end text-danger">{{ '{:,}'.format(r.outflow) }}</td></tr>
+  <tr class="table-active fw-semibold"><td>Closing money</td>
+    <td class="text-end">{{ '{:,}'.format(r.closing) }}</td></tr>
+</tbody></table>
+</div>
+<p class="small mt-2">
+{% if r.tied %}<span class="badge badge-ok">Closing equals the money accounts in the GL ✓</span>
+{% else %}<span class="badge badge-danger">Mismatch vs GL {{ '{:,}'.format(r.gl_closing) }}</span>{% endif %}
+<span class="text-muted ms-2">Direct method over the four money accounts; internal
+transfers excluded ({{ dfrom.strftime('%d %b') }}–{{ dto.strftime('%d %b %Y') }}).</span>
+</p>
+<a class="btn btn-link px-0" href="{{ url_for('accounting.fin_reports') }}">&larr; All reports</a>
+{% endblock %}

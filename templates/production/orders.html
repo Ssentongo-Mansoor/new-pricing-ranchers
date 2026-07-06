@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block heading %}Production — open orders{% endblock %}
+{% block content %}
+<p class="text-muted">Open orders and whether stock covers them now. Lines short of stock drive the production list.</p>
+<div class="mb-3"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('production.index') }}"><i class="bi bi-hammer"></i> To produce</a></div>
+{% if not rows %}
+  <div class="alert alert-info">No open orders.</div>
+{% else %}
+{% for r in rows %}
+  {% set o = r.order %}{% set cov = r.coverage %}
+  <div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <div>
+        <a href="{{ url_for('orders.detail', order_id=o.id) }}" class="fw-semibold">{{ o.number or o.id }}</a>
+        <span class="text-muted small">· {{ o.customer.name if o.customer else '' }} · delivery {{ o.delivery_date.strftime('%d %b %Y') if o.delivery_date else '—' }}</span>
+      </div>
+      {% if cov.short_lines == 0 %}<span class="badge badge-ok">{{ cov.status }}</span>
+      {% else %}<span class="badge badge-warn">{{ cov.status }} ({{ cov.short_lines }})</span>{% endif %}
+    </div>
+    <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Product</th><th class="text-end">Ordered</th><th class="text-end">In stock</th><th class="text-end">Short</th></tr></thead>
+      <tbody>
+      {% for ln in cov.lines %}
+        <tr class="{{ 'table-warning' if ln.short > 0 }}">
+          <td>{% if ln.product %}<a href="{{ url_for('production.product_detail', product_id=ln.product.id) }}">{{ ln.product.description }}</a>
+              <span class="text-muted small">{{ ln.product.article_no }}</span>{% else %}{{ ln.line.description }}{% endif %}</td>
+          <td class="text-end">{{ '%g'|format(ln.required) }} <span class="text-muted small">{{ ln.uom }}</span></td>
+          <td class="text-end">{{ '%g'|format(ln.on_hand) }}</td>
+          <td class="text-end {{ 'fw-semibold text-danger' if ln.short > 0 }}">{{ '%g'|format(ln.short) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+{% endfor %}
+{% endif %}
+{% endblock %}

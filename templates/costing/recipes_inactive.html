@@ -1,0 +1,37 @@
+{% extends "costing/_shell.html" %}
+{% block heading %}Inactive Recipes{% endblock %}
+{% block costing_content %}
+<div class="page-head">
+  <h1>Inactive Recipes</h1>
+  <div class="spacer"></div>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('recipes.index') }}"><i class="bi bi-arrow-left"></i> Back to recipes</a>
+</div>
+<div class="card"><div class="card-body">
+  <p class="text-muted small">Retired recipes are never deleted. Reactivating one recalculates its cost/kg using current ingredient prices.</p>
+  <table class="table table-hover align-middle">
+    <thead><tr><th>Product</th><th>Category</th><th class="num">Last cost/kg</th><th>Deactivated</th><th>Reason</th><th></th></tr></thead>
+    <tbody>
+      {% for r in recipes %}
+      <tr>
+        <td class="fw-semibold">{{ r.name }}</td>
+        <td class="small text-muted">{{ r.category.name if r.category else '—' }}</td>
+        <td class="num">{{ r.last_cost_per_kg|money if r.last_cost_per_kg else '—' }}</td>
+        <td class="small">{{ r.deactivated_at.strftime('%Y-%m-%d') if r.deactivated_at else '—' }}</td>
+        <td class="small text-muted">{{ r.deactivate_reason or '' }}</td>
+        <td>
+          {% if has_perm(current_user, 'edit_costing') %}
+          <form method="post" action="{{ url_for('recipes.toggle', rid=r.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="{{ url_for('recipes.inactive') }}">
+            <button class="btn btn-sm btn-outline-success py-0">Reactivate</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-muted text-center py-4">No inactive recipes.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+{% endblock %}

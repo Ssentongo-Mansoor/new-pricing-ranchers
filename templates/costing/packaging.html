@@ -1,0 +1,37 @@
+{% extends "costing/_shell.html" %}
+{% block heading %}Packaging{% endblock %}
+{% block costing_content %}
+<div class="page-head">
+  <h1>Packaging Cost Calculator</h1>
+  <div class="spacer"></div>
+  {% if has_perm(current_user, 'edit_costing') %}<a class="btn btn-sm btn-rf" href="{{ url_for('packaging.new') }}"><i class="bi bi-plus-lg"></i> New Config</a>{% endif %}
+</div>
+<div class="alert alert-light">Default packaging applied to new recipes: <strong class="text-rf">{{ default_packaging|money }}</strong> UGX/kg</div>
+<div class="row">
+  {% for cfg in configs %}
+  <div class="col-lg-6 mb-3">
+    <div class="card"><div class="card-body">
+      <div class="d-flex justify-content-between">
+        <h5 class="mb-0">{{ cfg.name }}</h5>
+        <span class="text-rf fw-bold">{{ cfg.total_per_kg|money }} /kg</span>
+      </div>
+      {% if cfg.note %}<div class="text-muted small">{{ cfg.note }}</div>{% endif %}
+      <table class="table table-sm mt-2 mb-2">
+        {% for it in cfg.items %}<tr><td>{{ it.material }}</td><td class="num">{{ it.unit_price|money }}</td></tr>{% endfor %}
+      </table>
+      {% if has_perm(current_user, 'edit_costing') %}
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('packaging.edit', cid=cfg.id) }}"><i class="bi bi-pencil"></i> Edit</a>
+      {% if current_user.is_admin %}
+      <form class="d-inline" method="post" action="{{ url_for('packaging.set_default', cid=cfg.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-success">Set as default</button></form>
+      {% endif %}
+      <form class="d-inline" method="post" action="{{ url_for('packaging.delete', cid=cfg.id) }}" onsubmit="return confirm('Delete config?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>
+      {% endif %}
+    </div></div>
+  </div>
+  {% else %}
+  <div class="col"><p class="text-muted">No packaging configs yet.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

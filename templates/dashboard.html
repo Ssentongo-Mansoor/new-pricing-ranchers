@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block heading %}Dashboard{% endblock %}
+{% macro ordstatus(s) %}
+  {% if s=='draft' %}<span class="badge bg-secondary">draft</span>
+  {% elif s=='submitted' %}<span class="badge" style="background:#ED1C24">submitted</span>
+  {% elif s=='placed' %}<span class="badge bg-dark">placed</span>
+  {% elif s=='in_fulfillment' %}<span class="badge" style="background:#F47A21">in fulfilment</span>
+  {% elif s=='ready_for_dispatch' %}<span class="badge" style="background:#6E7149">ready for dispatch</span>
+  {% elif s=='out_for_delivery' %}<span class="badge" style="background:#2E7D32">out for delivery</span>
+  {% elif s=='dispatched' %}<span class="badge" style="background:#2E7D32">dispatched</span>
+  {% elif s=='pending' %}<span class="badge badge-warn">pending stock</span>
+  {% elif s=='delivered' %}<span class="badge badge-ok">delivered</span>
+  {% elif s=='fulfilled' %}<span class="badge badge-ok">delivered</span>
+  {% else %}<span class="badge bg-secondary">{{ s }}</span>{% endif %}
+{% endmacro %}
+{% block content %}
+
+<div class="rf-hero">
+  <img class="rf-hero-logo" src="{{ url_for('static', filename='img/ranchers-logo.svg') }}" alt="">
+  {% set hr = now.hour %}
+  <h1>{{ 'Good morning' if hr < 12 else 'Good afternoon' if hr < 17 else 'Good evening' }}, {{ current_user.full_name.split(' ')[0] }}</h1>
+  <div class="sub">{{ today.strftime('%A %d %B %Y') }} · here's what needs your attention</div>
+</div>
+
+<div class="rf-kpis" style="grid-template-columns:repeat(7,1fr)">
+  <a href="{{ url_for('orders.index') }}"><div class="rf-kpi"><div class="num" style="color:#6E7149">{{ queue|length }}</div><div class="lbl">Active orders</div></div></a>
+  <a href="{{ url_for('orders.index', status='submitted') }}"><div class="rf-kpi"><div class="num" style="color:#ED1C24">{{ to_confirm|length }}</div><div class="lbl">To confirm</div></div></a>
+  <a href="{{ url_for('orders.index', status='in_fulfillment') }}"><div class="rf-kpi"><div class="num">{{ in_prep|length }}</div><div class="lbl">In fulfilment</div></div></a>
+  <a href="{{ url_for('orders.index', status='dispatched') }}"><div class="rf-kpi"><div class="num" style="color:#2E7D32">{{ dispatched|length }}</div><div class="lbl">Dispatched</div></div></a>
+  <a href="{{ url_for('orders.index', status='pending') }}"><div class="rf-kpi"><div class="num" style="color:#F9A03F">{{ pending|length }}</div><div class="lbl">Pending stock</div></div></a>
+  <a href="{{ url_for('orders.index') }}"><div class="rf-kpi"><div class="num" style="color:#2B2B2B">{{ backorders_open|length }}</div><div class="lbl">Open back orders</div></div></a>
+  <a href="{{ url_for('orders.index') }}"><div class="rf-kpi"><div class="num">{{ n_today }}</div><div class="lbl">Orders today</div></div></a>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="rf-card p-3 h-100">
+      <h2 class="h6 d-flex justify-content-between"><span><i class="bi bi-inbox text-rf-orange"></i> Active orders <span class="text-muted small fw-normal">({{ queue|length }}, oldest first)</span></span>
+        <a class="small" href="{{ url_for('orders.index') }}">Open Orders</a></h2>
+      <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Received</th><th>Order</th><th>Customer</th><th>Status</th><th class="text-end">Total</th></tr></thead>
+        <tbody>
+        {% for o in queue %}
+          <tr {% if order_delay(o)[0] %}class="table-danger"{% endif %}>
+            <td class="small text-nowrap">{{ (o.created_at or o.order_date).strftime('%d %b %H:%M') if o.created_at else o.order_date }}</td>
+            <td><a href="{{ url_for('orders.detail', order_id=o.id) }}" class="fw-semibold">{{ o.number }}</a>
+              {% if o.backorder_of_id %}<span class="badge bg-secondary">back order</span>{% endif %}</td>
+            <td>{{ o.customer.name }}</td>
+            <td>{{ ordstatus(o.status) }}</td>
+            <td class="text-end money">{{ o.total|money(o.currency) }}</td>
+          </tr>
+        {% else %}<tr><td colspan="5" class="text-center text-muted py-3">No active orders — everything is delivered.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+      </div>
+      <div class="form-text">Stays here from when an order is received until it is fully delivered.</div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="rf-card p-3 mb-3">
+      <h2 class="h6">Sales</h2>
+      <div class="d-flex justify-content-between"><span class="text-muted">Confirmed today</span>
+        <span class="money">{% for cur, v in val_today.items() %}{{ v|money(cur) }}{% if not loop.last %}, {% endif %}{% else %}—{% endfor %}</span></div>
+      <div class="d-flex justify-content-between"><span class="text-muted">Last 7 days ({{ n_week }} orders)</span>
+        <span class="money">{% for cur, v in val_week.items() %}{{ v|money(cur) }}{% if not loop.last %}, {% endif %}{% else %}—{% endfor %}</span></div>
+      <a class="small" href="{{ url_for('reports.sales') }}">Sales report &rarr;</a>
+    </div>
+    <div class="rf-card p-3">
+      <h2 class="h6">Alerts</h2>
+      {% if delayed %}<div class="alert alert-danger py-2 mb-2"><i class="bi bi-alarm"></i> {{ delayed|length }} order(s) past the delivery target. <a href="{{ url_for('orders.index') }}">View</a></div>{% endif %}
+      {% if to_confirm %}<div class="alert alert-info py-2 mb-2">{{ to_confirm|length }} customer order(s) awaiting confirmation. <a href="{{ url_for('orders.index', status='submitted') }}">Review</a></div>{% endif %}
+      {% if pending %}<div class="alert alert-warning py-2 mb-2">{{ pending|length }} order(s) pending stock. <a href="{{ url_for('orders.index', status='pending') }}">View</a></div>{% endif %}
+      {% for r in rate_alerts %}<div class="alert alert-{{ 'danger' if r.status_for()=='expired' else 'warning' }} py-2 mb-2">UGX→{{ r.quote_ccy }} rate {{ r.status_for() }} ({{ r.expiry_date }}). <a href="{{ url_for('exchange_rates.index') }}">Review</a></div>{% endfor %}
+      {% if open_offers %}<div class="alert alert-secondary py-2 mb-2">{{ open_offers|length }} open quote(s) awaiting the customer. <a href="{{ url_for('offers.index') }}">View</a></div>{% endif %}
+      {% if not (delayed or to_confirm or pending or rate_alerts or open_offers) %}<p class="text-muted mb-0">Nothing needs attention.</p>{% endif %}
+    </div>
+    {% if features.reminders and (crm_overdue or crm_today) %}
+    <div class="rf-card p-3 mt-3">
+      <h2 class="h6 d-flex justify-content-between"><span><i class="bi bi-flag text-rf-orange"></i> Follow-up reminders</span>
+        <a class="small" href="{{ url_for('crm.follow_ups') }}">All &rarr;</a></h2>
+      {% if crm_overdue %}<div class="alert alert-danger py-2 mb-2">{{ crm_overdue|length }} follow-up(s) overdue.</div>{% endif %}
+      {% if crm_today %}<div class="alert alert-warning py-2 mb-2">{{ crm_today|length }} follow-up(s) due today.</div>{% endif %}
+      <ul class="list-unstyled small mb-0">
+        {% for a in (crm_overdue + crm_today)[:6] %}
+        <li class="border-bottom py-1"><a href="{{ url_for('customers.detail', customer_id=a.customer_id) }}#activity">{{ a.customer.name }}</a>
+          <span class="text-muted">— {{ a.next_action }} ({{ a.next_action_date.strftime('%d %b') }})</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-7">
+    <div class="rf-card p-3 h-100">
+      <h2 class="h6">Recent orders</h2>
+      <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Order</th><th>Customer</th><th>Date</th><th>Status</th><th class="text-end">Total</th></tr></thead>
+        <tbody>
+        {% for o in recent %}
+          <tr><td><a href="{{ url_for('orders.detail', order_id=o.id) }}">{{ o.number }}</a></td>
+            <td>{{ o.customer.name }}</td><td class="small">{{ o.order_date }}</td>
+            <td>{{ ordstatus(o.status) }}</td>
+            <td class="text-end money">{{ o.total|money(o.currency) }}</td></tr>
+        {% else %}<tr><td colspan="5" class="text-center text-muted py-3">No orders yet.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="rf-card p-3 h-100">
+      <h2 class="h6 d-flex justify-content-between"><span><i class="bi bi-chat-dots text-rf-orange"></i> Messages</span>
+        <a class="small" href="{{ url_for('messages.index') }}">All</a></h2>
+      <ul class="list-group list-group-flush">
+        {% for t in msg_threads %}
+        <li class="list-group-item px-0 py-2">
+          <a href="{{ url_for('messages.thread', customer_id=t.customer.id) }}" class="d-flex justify-content-between text-decoration-none">
+            <span class="fw-semibold">{{ t.customer.name }}{% if t.unread %} <span class="badge badge-danger">{{ t.unread }}</span>{% endif %}</span>
+            <span class="small text-muted">{{ t.last.created_at.strftime('%d %b') }}</span>
+          </a>
+          <div class="small text-muted">{{ 'You: ' if t.last.sender_type=='staff' else '' }}{{ t.last.body[:60] }}{% if t.last.body|length>60 %}…{% endif %}</div>
+        </li>
+        {% else %}<li class="list-group-item px-0 text-muted">No customer messages.</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="rf-card p-3 h-100">
+      <h2 class="h6">Quick links</h2>
+      <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-primary btn-sm" href="{{ url_for('orders.new') }}"><i class="bi bi-plus-lg"></i> New order</a>
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('offers.new') }}"><i class="bi bi-receipt"></i> New offer</a>
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('pricelists.index') }}"><i class="bi bi-card-list"></i> Pricelists ({{ n_generic }})</a>
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('products.index') }}"><i class="bi bi-box-seam"></i> Products ({{ n_products }})</a>
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('customers.index') }}"><i class="bi bi-person-vcard"></i> Customers</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

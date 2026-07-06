@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block heading %}Admin{% endblock %}
+{% block content %}
+{% include "admin/_nav.html" %}
+<h2 class="h6 mb-3">Import reports</h2>
+{% for r in reports %}
+<div class="rf-card p-3 mb-2">
+  <div class="d-flex justify-content-between">
+    <strong>{{ r.source }}</strong>
+    <span class="small text-muted">{{ r.ts.strftime('%Y-%m-%d %H:%M') }}</span>
+  </div>
+  <div class="small">{{ r.rows_ok }} rows imported · <span class="{{ 'text-danger' if r.rows_failed else 'text-muted' }}">{{ r.rows_failed }} skipped</span></div>
+  {% if r.detail %}
+  <details class="mt-2"><summary class="small">Show {{ r.rows_failed }} skipped row(s)</summary>
+    <pre class="small mb-0" style="white-space:pre-wrap">{{ r.detail }}</pre></details>
+  {% endif %}
+</div>
+{% else %}
+<p class="text-muted">No imports recorded yet.</p>
+{% endfor %}
+{% endblock %}

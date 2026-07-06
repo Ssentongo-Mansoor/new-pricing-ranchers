@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% from "reports/_macros.html" import daterange %}
+{% block heading %}Sales report{% endblock %}
+{% block content %}
+{% include "reports/_nav.html" %}
+{{ daterange('reports.sales', {'group': group, 'segment': seg}) }}
+
+<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+  <div class="btn-group btn-group-sm">
+    {% for g, lbl in [('total','By total'),('customer','By customer'),('category','By category'),('product','By product'),('rep','By rep')] %}
+    <a class="btn {{ 'btn-primary' if group==g else 'btn-outline-secondary' }}" href="{{ url_for('reports.sales', **{'from':frm,'to':to,'group':g,'segment':seg}) }}">{{ lbl }}</a>
+    {% endfor %}
+  </div>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('reports.sales', **{'from':frm,'to':to,'group':group,'segment':seg,'export':'csv'}) }}"><i class="bi bi-download"></i> CSV</a>
+</div>
+
+<div class="mb-2">
+  <span class="small text-muted me-2">Show:</span>
+  <div class="btn-group btn-group-sm">
+    {% for s, lbl in [('all','All customers'),('direct','Direct customers'),('distributor','Distributors')] %}
+    <a class="btn {{ 'btn-primary' if seg==s else 'btn-outline-secondary' }}" href="{{ url_for('reports.sales', **{'from':frm,'to':to,'group':group,'segment':s}) }}">{{ lbl }}</a>
+    {% endfor %}
+  </div>
+</div>
+<p class="small text-muted">{{ n_orders }} invoice(s) in {{ frm }} → {{ to }} · untaxed UGX, net of credit notes (from uploaded history).</p>
+
+{% if group=='total' %}
+  <div class="table-responsive rf-card" style="max-width:480px">
+  <table class="table table-sm mb-0"><thead><tr><th>Currency</th><th class="text-end">Orders</th><th class="text-end">Value</th></tr></thead>
+    <tbody>
+    {% for cur, v in data.total.items() %}
+      <tr><td>{{ cur }}</td><td class="text-end">{{ v.orders }}</td><td class="text-end money fw-semibold">{{ v.value|money(cur) }}</td></tr>
+    {% else %}<tr><td colspan="3" class="text-muted">No sales in this period.</td></tr>{% endfor %}
+    </tbody></table>
+  </div>
+
+{% elif group=='product' %}
+  {% for cur, items in data.product.items() %}
+  <h3 class="h6 mt-3">{{ cur }}</h3>
+  <div class="table-responsive rf-card">
+  <table class="table table-sm mb-0"><thead><tr><th>Article</th><th>Description</th><th class="text-end">Qty</th><th class="text-end">Value</th></tr></thead>
+    <tbody>{% for art, v in items %}
+      <tr><td>{{ art }}</td><td>{{ v.desc }}</td><td class="text-end">{{ '%g'|format(v.qty) }}</td><td class="text-end money">{{ v.value|money(cur) }}</td></tr>
+    {% endfor %}</tbody></table></div>
+  {% else %}<p class="text-muted">No sales in this period.</p>{% endfor %}
+
+{% elif group=='category' %}
+  {% for cur, items in data.category.items() %}
+  <h3 class="h6 mt-3">{{ cur }}</h3>
+  <div class="rf-card p-3 mb-3">
+    {% set mx = cat_max.get(cur, 0) or 1 %}
+    {% for name, v in items %}
+    <div class="mb-2">
+      <div class="d-flex justify-content-between small"><span class="fw-semibold">{{ name }}</span>
+        <span class="money">{{ v.value|money(cur) }} <span class="text-muted">· {{ v.orders }} order(s)</span></span></div>
+      <div style="background:#efe2d4; border-radius:6px; height:18px; overflow:hidden">
+        <div style="height:100%; width:{{ (v.value / mx * 100)|round(1) }}%; background:var(--rf-orange)"></div>
+      </div>
+    </div>
+    {% else %}<p class="text-muted mb-0">No sales in this period.</p>{% endfor %}
+  </div>
+  {% else %}<p class="text-muted">No sales in this period.</p>{% endfor %}
+
+{% else %}
+  {% set label = {'customer':'Customer','rep':'Rep'}.get(group,'Customer') %}
+  {% for cur, items in data[group].items() %}
+  <h3 class="h6 mt-3">{{ cur }}</h3>
+  <div class="table-responsive rf-card">
+  <table class="table table-sm mb-0"><thead><tr><th>{{ label }}</th><th class="text-end">Orders</th><th class="text-end">Value</th></tr></thead>
+    <tbody>{% for name, v in items %}
+      <tr><td>{{ name }}</td><td class="text-end">{{ v.orders }}</td><td class="text-end money">{{ v.value|money(cur) }}</td></tr>
+    {% endfor %}</tbody></table></div>
+  {% else %}<p class="text-muted">No sales in this period.</p>{% endfor %}
+{% endif %}
+{% endblock %}

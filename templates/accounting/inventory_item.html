@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block heading %}{{ item.name }}{% endblock %}
+{% block content %}
+<div class="rf-card p-3 mb-3">
+  <div class="row small">
+    <div class="col-md-2"><span class="text-muted">Stage</span><br>{{ item.stage_label }}</div>
+    <div class="col-md-2"><span class="text-muted">Unit</span><br>{{ item.stock_unit or 'undefined' }}
+      {% if item.pack_weight_kg and item.stock_unit != 'kg' %}<br><span class="text-muted">{{ '%g'|format(item.pack_weight_kg) }} kg / {{ item.stock_unit }}</span>{% endif %}</div>
+    <div class="col-md-2"><span class="text-muted">Qty on hand</span><br>{{ '%g'|format(item.qty_on_hand or 0) }}</div>
+    <div class="col-md-2"><span class="text-muted">Avg cost</span><br>{{ '{:,.2f}'.format(item.avg_cost) if item.avg_cost else '—' }}</div>
+    <div class="col-md-2"><span class="text-muted">Value (UGX)</span><br>{{ '{:,}'.format(item.value_on_hand or 0) }}</div>
+    <div class="col-md-2"><span class="text-muted">Unit cost for new stock</span><br>
+      {% if cost %}{{ '{:,}'.format(cost) }}{% else %}<span class="text-danger">{{ cost_reason }}</span>{% endif %}</div>
+  </div>
+</div>
+
+{% if can_post %}
+<div class="rf-card p-3 mb-3">
+  <form method="post" action="{{ url_for('accounting.inventory_item_costing', item_id=item.id) }}" class="row g-2 align-items-end">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="col-auto"><label class="form-label small">Unit</label>
+      <select class="form-select form-select-sm" name="stock_unit">
+        {% for u in ['', 'kg', 'pack', 'pc'] %}<option value="{{ u }}" {{ 'selected' if u == (item.stock_unit or '') }}>{{ u or '—' }}</option>{% endfor %}
+      </select></div>
+    <div class="col-auto"><label class="form-label small">Pack weight (kg)</label>
+      <input class="form-control form-control-sm" name="pack_weight_kg" value="{{ '%g'|format(item.pack_weight_kg) if item.pack_weight_kg }}" style="width:110px"></div>
+    <div class="col-auto"><label class="form-label small">Manual cost (UGX/unit)</label>
+      <input class="form-control form-control-sm" name="manual_cost" value="{{ '{:,}'.format(item.manual_cost_minor) if item.manual_cost_minor }}" style="width:130px"></div>
+    <div class="col-auto"><label class="form-label small">Stage</label>
+      <select class="form-select form-select-sm" name="stage">
+        {% for k, label in item.STAGES.items() %}<option value="{{ k }}" {{ 'selected' if k == item.stage }}>{{ label }}</option>{% endfor %}
+      </select></div>
+    <div class="col-auto"><button class="btn btn-sm btn-primary">Save costing details</button></div>
+  </form>
+</div>
+{% endif %}
+
+<div class="table-responsive rf-card">
+<table class="table table-sm align-middle mb-0">
+  <thead><tr><th>Date</th><th>Kind</th><th class="text-end">Qty</th>
+    <th class="text-end">Value (UGX)</th><th class="text-end">Qty after</th>
+    <th class="text-end">Value after</th><th>Journal</th><th>Note</th></tr></thead>
+  <tbody>
+  {% for m in item.movements|reverse %}
+    <tr>
+      <td class="small">{{ m.created_at.strftime('%d %b %Y %H:%M') }}</td>
+      <td class="small">{{ m.kind|replace('_',' ')|title }}</td>
+      <td class="text-end {{ 'text-danger' if m.qty < 0 }}">{{ '%g'|format(m.qty) }}</td>
+      <td class="text-end {{ 'text-danger' if m.value_ugx < 0 }}">{{ '{:,}'.format(m.value_ugx) }}</td>
+      <td class="text-end">{{ '%g'|format(m.qty_after) }}</td>
+      <td class="text-end">{{ '{:,}'.format(m.value_after) }}</td>
+      <td class="small">{% if m.journal_entry %}<a href="{{ url_for('accounting.journal_view', entry_id=m.journal_entry_id) }}">{{ m.journal_entry.entry_no }}</a>{% endif %}</td>
+      <td class="small">{{ m.note or '' }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="8" class="text-center text-muted py-4">No valued movements yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<a class="btn btn-link mt-3 px-0" href="{{ url_for('accounting.inventory') }}">&larr; Back to inventory</a>
+{% endblock %}

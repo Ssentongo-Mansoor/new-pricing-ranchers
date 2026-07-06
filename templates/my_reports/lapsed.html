@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block heading %}Win back{% endblock %}
+{% macro ugx(v) %}UGX {{ '{:,.0f}'.format(v or 0) }}{% endmacro %}
+{% block content %}
+{% include "my_reports/_nav.html" %}
+<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+  <h1 class="h6 mb-0">Customers gone quiet</h1>
+  <form method="get" class="d-flex align-items-center gap-2">
+    <label class="small text-muted">No order in</label>
+    <select class="form-select form-select-sm" name="months" onchange="this.form.submit()" style="width:auto">
+      {% for m in [2,3,6] %}<option value="{{ m }}" {{ 'selected' if months==m }}>{{ m }}+ months</option>{% endfor %}
+    </select>
+  </form>
+</div>
+<div class="rf-card p-0">
+  <table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Customer</th><th>Last order</th><th>Quiet for</th><th class="text-end">Lifetime</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td class="fw-semibold small">{{ r.customer.name }}</td>
+        <td class="small">{{ r.last.strftime('%b %Y') }}</td>
+        <td class="small text-danger">{{ r.gap }} month(s)</td>
+        <td class="text-end small">{{ ugx(r.life) }}</td>
+        <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('customers.detail', customer_id=r.customer.id) }}">Open</a></td>
+      </tr>
+    {% else %}<tr><td colspan="5" class="text-center text-muted py-3">No quiet customers — nice work.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

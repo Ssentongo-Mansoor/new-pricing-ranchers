@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block heading %}Customer insights{% endblock %}
+{% macro trendbadge(t) %}
+  {% if t=='new' %}<span class="badge badge-ok">new</span>
+  {% elif t=='up' %}<span class="badge badge-ok"><i class="bi bi-arrow-up"></i> up</span>
+  {% elif t=='down' %}<span class="badge badge-warn"><i class="bi bi-arrow-down"></i> down</span>
+  {% elif t=='stopped' %}<span class="badge badge-danger">stopped</span>
+  {% else %}<span class="badge bg-secondary">steady</span>{% endif %}
+{% endmacro %}
+{% block content %}
+{% include "reports/_nav.html" %}
+
+<form class="row g-2 align-items-end mb-3" method="get">
+  <div class="col-md-4"><label class="form-label small mb-0">Customer</label>
+    <select class="form-select" name="customer_id" onchange="this.form.submit()">
+      <option value="">Choose a customer…</option>
+      {% for c in customers %}<option value="{{ c.id }}" {{ 'selected' if selected and c.id==selected.id }}>{{ c.name }}</option>{% endfor %}
+    </select></div>
+  <div class="col-md-3"><label class="form-label small mb-0">Window (days each)</label>
+    <input class="form-control" type="number" name="days" value="{{ days }}"></div>
+  <div class="col-md-2"><button class="btn btn-primary w-100">Run</button></div>
+  {% if selected %}<div class="col-md-3 text-end">
+    <a class="btn btn-outline-secondary" href="{{ url_for('reports.customer_insights', **{'customer_id':selected.id,'days':days,'export':'csv'}) }}"><i class="bi bi-download"></i> CSV</a></div>{% endif %}
+</form>
+
+{% if not selected %}
+<div class="rf-card p-4 text-muted">Choose a customer to see their product mix, trends and dropped products.</div>
+{% else %}
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="rf-stat"><div class="num">{{ summary.orders }}</div><div class="lbl">Active months (recent)</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-stat"><div class="num" style="font-size:1.2rem">{% for cur,v in summary.value.items() %}{{ v|money(cur) }}<br>{% else %}—{% endfor %}</div><div class="lbl">Revenue (recent)</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-stat"><div class="num">{{ summary.n_products }}</div><div class="lbl">Products bought</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-stat"><div class="num {{ 'text-danger' if summary.n_stopped }}">{{ summary.n_stopped }}</div><div class="lbl">Stopped buying</div></div></div>
+</div>
+<p class="small text-muted">
+  {% if selected.category %}<span class="badge bg-secondary">{{ selected.category.name }}</span> {% endif %}
+  {% if selected.segment=='distributor' %}<span class="badge" style="background:var(--rf-orange)">Distributor</span> {% endif %}
+  Last order: {{ summary.last_order or '—' }}. Comparing the last {{ days }} days against the {{ days }} days before that.</p>
+
+{% if hist_years %}
+<div class="rf-card p-3 mb-3">
+  <h2 class="h6 d-flex justify-content-between flex-wrap"><span><i class="bi bi-clock-history text-rf-orange"></i> Sales history <span class="text-muted small fw-normal">(uploaded · net untaxed UGX · latest {{ hist_latest }})</span></span>
+    {% if hist_n_lapsed %}<span class="badge badge-danger">{{ hist_n_lapsed }} product(s) no longer bought</span>{% endif %}</h2>
+  {% if hist_month_labels %}<canvas id="histMonth" height="70" class="mb-3"></canvas>{% endif %}
+  <div class="row g-3">
+    <div class="col-md-4">
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Year</th><th class="text-end">Net revenue</th></tr></thead>
+        <tbody>
+        {% for y, v in hist_years.items() %}
+          <tr><td class="fw-semibold">{{ y }}</td><td class="text-end money">UGX {{ '{:,.0f}'.format(v) }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% if hist_outstanding %}<div class="small text-danger mt-2">Outstanding: UGX {{ '{:,.0f}'.format(hist_outstanding) }}</div>{% endif %}
+    </div>
+    <div class="col-md-8">
+      <div class="small text-muted mb-1">Product mix by year — rows shaded red are no longer bought (no purchase in 3+ months)</div>
+      <div class="table-responsive" style="max-height:340px; overflow:auto">
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Product</th>{% for y in hist_prod_years %}<th class="text-end">{{ y }}</th>{% endfor %}<th class="text-end">Total</th><th>Last bought</th></tr></thead>
+        <tbody>
+        {% for name, total, by, last_label, lapsed in hist_products %}
+          <tr class="{{ 'table-danger' if lapsed }}"><td class="small">{{ name }}</td>
+            {% for y in hist_prod_years %}<td class="text-end small money">{{ '{:,.0f}'.format(by.get(y,0)) }}</td>{% endfor %}
+            <td class="text-end money fw-semibold">{{ '{:,.0f}'.format(total) }}</td>
+            <td class="small {{ 'text-danger' if lapsed }}">{{ last_label }}{% if lapsed %} <i class="bi bi-exclamation-circle"></i>{% endif %}</td></tr>
+        {% else %}<tr><td colspan="9" class="text-muted small">No product-level history for this customer.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<h2 class="h6"><i class="bi bi-cart-check text-rf-orange"></i> Recent orders in the app</h2>
+<div class="table-responsive rf-card">
+<table class="table table-sm align-middle mb-0">
+  <thead><tr><th>Article</th><th>Description</th><th class="text-end">Recent qty</th><th class="text-end">Prev qty</th><th class="text-end">Recent value</th><th>Last ordered</th><th>Trend</th></tr></thead>
+  <tbody>
+  {% for e in products %}
+    <tr class="{{ 'table-warning' if e.trend=='stopped' }}">
+      <td class="fw-semibold">{{ e.article }}</td><td>{{ e.desc }}</td>
+      <td class="text-end">{{ '%g'|format(e.recent_q) }}</td>
+      <td class="text-end text-muted">{{ '%g'|format(e.prev_q) }}</td>
+      <td class="text-end money">{{ e.recent_v|money(e.currency) }}</td>
+      <td class="small">{{ e.last }}</td>
+      <td>{{ trendbadge(e.trend) }}</td>
+    </tr>
+  {% else %}<tr><td colspan="7" class="text-center text-muted py-3">No orders on record for this customer.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if selected and hist_month_labels %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script>
+const ugxTick = v => 'UGX ' + Number(v).toLocaleString();
+(function(){
+  const ctx=document.getElementById('histMonth'); if(!ctx) return;
+  new Chart(ctx,{type:'line',data:{labels:{{ hist_month_labels|tojson }},
+    datasets:[{label:'Net revenue',data:{{ hist_month_values|tojson }},borderColor:'#F47A21',
+      backgroundColor:'rgba(244,122,33,0.12)',fill:true,tension:0.3,pointRadius:0,borderWidth:2}]},
+    options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>ugxTick(c.parsed.y)}}},
+      scales:{x:{ticks:{maxTicksLimit:12,autoSkip:true}},y:{ticks:{callback:ugxTick}}}}});
+})();
+</script>
+{% endif %}
+{% endblock %}

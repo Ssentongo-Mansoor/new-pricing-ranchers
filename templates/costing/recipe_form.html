@@ -1,0 +1,242 @@
+{% extends "costing/_shell.html" %}
+{% block heading %}{{ 'Edit' if recipe else 'New' }} Recipe{% endblock %}
+{% block costing_content %}
+<div class="page-head"><h1>{{ 'Edit' if recipe else 'New' }} Recipe</h1></div>
+
+<form method="post" id="recipeForm">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="row">
+  <div class="col-lg-8">
+    <div class="card mb-3"><div class="card-body">
+      <div class="row">
+        <div class="col-md-7 mb-3"><label class="form-label">Product name</label>
+          <input name="name" class="form-control" required value="{{ recipe.name if recipe else '' }}"></div>
+        <div class="col-md-5 mb-3"><label class="form-label">Category</label>
+          <select name="category_id" class="form-select" id="catSelect">
+            <option value="">— none —</option>
+            {% for c in categories %}<option value="{{ c.id }}" {{ 'selected' if recipe and recipe.category_id==c.id }}>{{ c.name }}</option>{% endfor %}
+          </select>
+          <input name="new_category" class="form-control form-control-sm mt-1" placeholder="…or type a new category">
+        </div>
+      </div>
+      <div class="mb-2"><label class="form-label">Batch label (optional)</label>
+        <input name="batch_label" class="form-control form-control-sm" value="{{ recipe.batch_label or '' if recipe else '' }}"></div>
+    </div></div>
+
+    <div class="card mb-3"><div class="card-body">
+      <h6 class="text-uppercase small text-muted">Ingredients</h6>
+      <p class="small text-muted">Type to search the ingredient master or a spice mix. Pick a match to pull its cost live, or leave unmatched to enter a fixed cost.</p>
+      <table class="table table-sm line-table">
+        <thead><tr><th style="width:42%">Ingredient / Spice mix</th><th class="num">Mass (kg)</th><th class="num">Cost/kg</th><th class="num">Batch</th><th></th></tr></thead>
+        <tbody id="lineBody"></tbody>
+      </table>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="addLine"><i class="bi bi-plus"></i> Add ingredient</button>
+      <datalist id="ingOptions"></datalist>
+    </div></div>
+
+    <div class="card mb-3"><div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4"><label class="form-label">Casing type</label>
+          <input name="casing_type" class="form-control form-control-sm" value="{{ recipe.casing_type or '' if recipe else '' }}"></div>
+        <div class="col-md-4"><label class="form-label">Casing cost/kg</label>
+          <input name="casing_cpk" id="casingCpk" type="number" step="0.0001" class="form-control form-control-sm calc" value="{{ recipe.casing_cpk if recipe else 0 }}"></div>
+        <div class="col-md-4"><label class="form-label">Casing % of batch</label>
+          <input name="casing_pct" id="casingPct" type="number" step="0.0001" class="form-control form-control-sm calc" value="{{ recipe.casing_pct if recipe else 0 }}"></div>
+        <div class="col-md-4"><label class="form-label">Overhead/kg <span class="text-muted small">(blank = global {{ default_overhead|round|int }})</span></label>
+          <input name="overhead_override" id="overhead" type="number" step="0.0001" class="form-control form-control-sm calc" value="{{ recipe.overhead_override if (recipe and recipe.overhead_override is not none) else '' }}"></div>
+        <div class="col-md-4"><label class="form-label">Packaging/kg</label>
+          <input name="packaging_cpk" id="packaging" type="number" step="0.0001" class="form-control form-control-sm calc" value="{{ recipe.packaging_cpk if recipe else default_packaging }}"></div>
+      </div>
+      <hr>
+      <h6 class="text-uppercase small text-muted">Extra cost lines (optional)</h6>
+      <table class="table table-sm"><tbody id="extraBody"></tbody></table>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="addExtra"><i class="bi bi-plus"></i> Add extra</button>
+    </div></div>
+
+    <div class="mb-3">
+      <label class="form-label">Note</label>
+      <textarea name="note" class="form-control" rows="2">{{ recipe.note or '' if recipe else '' }}</textarea>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card builder-totals"><div class="card-body">
+      <h6 class="text-uppercase small text-muted">Live cost (UGX/kg)</h6>
+      <table class="table table-sm mb-2">
+        <tr><td>Total mass</td><td class="num"><span id="tMass">0</span> kg</td></tr>
+        <tr><td>Mince/emulsion</td><td class="num" id="tMince">0</td></tr>
+        <tr><td>Casing</td><td class="num" id="tCasing">0</td></tr>
+        <tr><td>Overhead</td><td class="num" id="tOverhead">0</td></tr>
+        <tr><td>Packaging</td><td class="num" id="tPackaging">0</td></tr>
+        <tr><td>Extras</td><td class="num" id="tExtras">0</td></tr>
+        <tr class="table-active fw-bold"><td>Final cost/kg</td><td class="num text-rf" id="tFinal">0</td></tr>
+      </table>
+      <button class="btn btn-rf w-100">Save recipe</button>
+      <a class="btn btn-link w-100" href="{{ url_for('recipes.index') }}">Cancel</a>
+    </div></div>
+  </div>
+</div>
+</form>
+
+<template id="rowTpl">
+  <tr>
+    <td>
+      <input class="form-control form-control-sm line-name" name="line_name" list="ingOptions" autocomplete="off" placeholder="Search…">
+      <input type="hidden" name="line_kind" value="manual">
+      <input type="hidden" name="line_ref" value="">
+    </td>
+    <td><input class="form-control form-control-sm num line-mass calc" name="line_mass" type="number" step="0.0001" value="0"></td>
+    <td><input class="form-control form-control-sm num line-cost calc" name="line_cost" type="number" step="0.0001" value="0"></td>
+    <td class="num line-batch">0</td>
+    <td><button type="button" class="btn btn-sm btn-outline-danger py-0 del"><i class="bi bi-x"></i></button></td>
+  </tr>
+</template>
+<template id="extraTpl">
+  <tr>
+    <td><input class="form-control form-control-sm" name="extra_name" placeholder="e.g. Euro Net"></td>
+    <td style="width:30%"><input class="form-control form-control-sm num calc" name="extra_value" type="number" step="0.0001" value="0"></td>
+    <td style="width:40px"><button type="button" class="btn btn-sm btn-outline-danger py-0 del"><i class="bi bi-x"></i></button></td>
+  </tr>
+</template>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const lineBody = document.getElementById('lineBody');
+const extraBody = document.getElementById('extraBody');
+const rowTpl = document.getElementById('rowTpl');
+const extraTpl = document.getElementById('extraTpl');
+const dataList = document.getElementById('ingOptions');
+const optionMap = {};   // lowercased name -> {id, type, cost}
+const defaultOverhead = {{ default_overhead }};
+
+function fmt(v){ return Math.round(v).toLocaleString('en-US'); }
+
+async function searchItems(q) {
+  if (!q || q.length < 1) return;
+  const [ing, mix] = await Promise.all([
+    fetch('/ingredients/search.json?q=' + encodeURIComponent(q)).then(r=>r.json()),
+    fetch('/spice-mixes/search.json?q=' + encodeURIComponent(q)).then(r=>r.json())
+  ]);
+  dataList.innerHTML = '';
+  [...ing, ...mix].forEach(it => {
+    optionMap[it.name.toLowerCase()] = it;
+    const o = document.createElement('option');
+    o.value = it.name;
+    o.label = it.type === 'spice_mix' ? 'Spice mix · ' + fmt(it.cost) : 'Ingredient · ' + fmt(it.cost);
+    dataList.appendChild(o);
+  });
+}
+
+function bindRow(tr) {
+  const nameInput = tr.querySelector('.line-name');
+  const kind = tr.querySelector('[name=line_kind]');
+  const ref = tr.querySelector('[name=line_ref]');
+  const costInput = tr.querySelector('.line-cost');
+  let timer;
+  nameInput.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => searchItems(nameInput.value), 150);
+  });
+  nameInput.addEventListener('change', () => {
+    const match = optionMap[nameInput.value.trim().toLowerCase()];
+    if (match) {
+      kind.value = match.type;
+      ref.value = match.id;
+      costInput.value = match.cost;
+      costInput.readOnly = true;
+    } else {
+      kind.value = 'manual';
+      ref.value = '';
+      costInput.readOnly = false;
+    }
+    recalc();
+  });
+  costInput.addEventListener('input', recalc);
+  tr.querySelector('.line-mass').addEventListener('input', recalc);
+  tr.querySelector('.del').addEventListener('click', () => { tr.remove(); recalc(); });
+}
+
+function addRow(data) {
+  const tr = rowTpl.content.cloneNode(true).querySelector('tr');
+  if (data) {
+    tr.querySelector('.line-name').value = data.name || '';
+    tr.querySelector('.line-mass').value = data.mass || 0;
+    tr.querySelector('.line-cost').value = data.cost || 0;
+    tr.querySelector('[name=line_kind]').value = data.kind || 'manual';
+    tr.querySelector('[name=line_ref]').value = data.ref || '';
+    if (data.kind && data.kind !== 'manual') tr.querySelector('.line-cost').readOnly = true;
+    if (data.name) optionMap[data.name.toLowerCase()] = {id: data.ref, type: data.kind, cost: data.cost};
+  }
+  lineBody.appendChild(tr);
+  bindRow(tr);
+}
+function addExtra(data) {
+  const tr = extraTpl.content.cloneNode(true).querySelector('tr');
+  if (data) { tr.querySelector('[name=extra_name]').value = data.name; tr.querySelector('[name=extra_value]').value = data.value; }
+  tr.querySelector('.del').addEventListener('click', () => { tr.remove(); recalc(); });
+  tr.querySelector('[name=extra_value]').addEventListener('input', recalc);
+  extraBody.appendChild(tr);
+}
+
+let recalcTimer;
+function recalc() {
+  clearTimeout(recalcTimer);
+  recalcTimer = setTimeout(doRecalc, 120);
+}
+function doRecalc() {
+  const lines = [...lineBody.querySelectorAll('tr')].map(tr => ({
+    mass: tr.querySelector('.line-mass').value,
+    kind: tr.querySelector('[name=line_kind]').value,
+    ref: tr.querySelector('[name=line_ref]').value,
+    cost: tr.querySelector('.line-cost').value,
+  }));
+  const extras = [...extraBody.querySelectorAll('[name=extra_value]')].map(e => e.value);
+  const payload = {
+    lines, extras,
+    casing_cpk: document.getElementById('casingCpk').value,
+    casing_pct: document.getElementById('casingPct').value,
+    overhead: document.getElementById('overhead').value,
+    packaging: document.getElementById('packaging').value,
+  };
+  fetch('/recipes/calc.json', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})
+    .then(r=>r.json()).then(d => {
+      document.getElementById('tMass').textContent = (d.total_mass||0).toFixed(2);
+      document.getElementById('tMince').textContent = fmt(d.mince);
+      document.getElementById('tCasing').textContent = fmt(d.casing);
+      document.getElementById('tOverhead').textContent = fmt(d.overhead);
+      document.getElementById('tPackaging').textContent = fmt(d.packaging);
+      document.getElementById('tExtras').textContent = fmt(d.extras);
+      document.getElementById('tFinal').textContent = fmt(d.final);
+      // per-row batch
+      [...lineBody.querySelectorAll('tr')].forEach(tr => {
+        const m = parseFloat(tr.querySelector('.line-mass').value||0);
+        const c = parseFloat(tr.querySelector('.line-cost').value||0);
+        tr.querySelector('.line-batch').textContent = fmt(m*c);
+      });
+    });
+}
+
+document.getElementById('addLine').addEventListener('click', () => addRow());
+document.getElementById('addExtra').addEventListener('click', () => addExtra());
+document.querySelectorAll('.calc').forEach(e => e.addEventListener('input', recalc));
+
+{% if recipe %}
+{% for d in recipe.lines %}
+addRow({
+  name: {{ d.display_name|tojson }},
+  mass: {{ d.mass_kg }},
+  kind: {{ ('ingredient' if d.ingredient_id else ('spice_mix' if d.spice_mix_id else 'manual'))|tojson }},
+  ref: {{ (d.ingredient_id or d.spice_mix_id or '')|tojson }},
+  cost: {{ (d.ingredient.total_cost if d.ingredient else (mix_cost(d.spice_mix) if d.spice_mix else (d.cost_override or 0)))|round(4) }}
+});
+{% endfor %}
+{% for e in recipe.extras %}
+addExtra({name: {{ e.name|tojson }}, value: {{ e.value_per_kg }} });
+{% endfor %}
+{% else %}
+addRow(); addRow(); addRow();
+{% endif %}
+doRecalc();
+</script>
+{% endblock %}

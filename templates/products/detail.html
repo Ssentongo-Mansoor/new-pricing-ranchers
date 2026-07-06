@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block heading %}{{ product.article_no }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-end gap-2 mb-2">
+  {% if current_user.can_manage_all %}
+  <a class="btn btn-sm btn-outline-primary" href="{{ url_for('products.edit', product_id=product.id) }}"><i class="bi bi-pencil"></i> Edit</a>
+  <form method="post" action="{{ url_for('products.delete', product_id=product.id) }}"
+        onsubmit="return confirm('Delete {{ product.article_no }} permanently? This removes it from all pricelists. (Blocked if it is on existing orders.)')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Delete</button></form>
+  {% endif %}
+</div>
+<div class="row g-3">
+  <div class="col-lg-5"><div class="rf-card p-4">
+    <h2 class="h6">{{ product.description }}</h2>
+    <dl class="row mb-0 small">
+      <dt class="col-4">Article no</dt><dd class="col-8">{{ product.article_no }}</dd>
+      <dt class="col-4">Barcode</dt><dd class="col-8">{{ product.barcode or '—' }}</dd>
+      <dt class="col-4">Pack</dt><dd class="col-8">{{ product.pack_size or '—' }}</dd>
+      <dt class="col-4">UoM</dt><dd class="col-8">{{ product.unit_of_measure or '—' }}</dd>
+      <dt class="col-4">Category</dt><dd class="col-8">{{ product.category.full_name if product.category else '—' }}</dd>
+      <dt class="col-4">Status</dt><dd class="col-8">{{ product.status }}</dd>
+    </dl>
+  </div></div>
+  <div class="col-lg-7"><div class="rf-card p-4">
+    {% if addable %}
+    <form method="post" action="{{ url_for('pricelists.add_product_line', list_id=0) }}" id="addToList"
+          class="d-flex flex-wrap gap-2 align-items-end mb-3"
+          onsubmit="this.action=this.action.replace('/0/','/'+this.list_id.value+'/')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="flex-grow-1">
+        <label class="form-label small mb-1">Add this product to a pricelist</label>
+        <select class="form-select form-select-sm" name="list_id" required>
+          <option value="">Choose a pricelist…</option>
+          {% for pl in addable %}
+          <option value="{{ pl.id }}">{{ pl.name }}{{ ' (customer)' if pl.is_customer }} · {{ pl.currency }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <input type="hidden" name="article_no" value="{{ product.article_no }}">
+      <button class="btn btn-sm btn-primary">Add &amp; set price</button>
+    </form>
+    {% endif %}
+    <h2 class="h6">Appears on these lists</h2>
+    <table class="table table-sm mb-0">
+      <thead><tr><th>List</th><th>Currency</th><th class="text-end">Prices</th></tr></thead>
+      <tbody>
+      {% for l in product.lines %}
+        <tr>
+          <td><a href="{{ url_for('customer_pricelists.detail', list_id=l.pricelist_id) if l.pricelist.is_customer else url_for('pricelists.detail', list_id=l.pricelist_id) }}">{{ l.pricelist.name }}</a></td>
+          <td>{{ l.pricelist.currency }}</td>
+          <td class="text-end small money">
+            {% for t in l.pricelist.tiers %}{% set v = l.price_for(t.key) %}{% if v is not none %}{{ t.label }}: {{ v|money(l.pricelist.currency) }}<br>{% endif %}{% endfor %}
+          </td>
+        </tr>
+      {% else %}<tr><td colspan="3" class="text-muted">Not on any list.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+</div>
+{% endblock %}

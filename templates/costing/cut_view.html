@@ -1,0 +1,100 @@
+{% extends "costing/_shell.html" %}
+{% block heading %}Carcass{% endblock %}
+{% block costing_content %}
+<div class="page-head">
+  <h1>{{ carcass.label }} <span class="badge bg-light text-dark align-middle">{{ carcass.species }}</span></h1>
+  <div class="spacer"></div>
+  {% if has_perm(current_user, 'edit_costing') %}
+  <a class="btn btn-sm btn-rf" href="{{ url_for('cuts.edit', cid=carcass.id) }}"><i class="bi bi-pencil"></i> Edit</a>
+  <form class="d-inline" method="post" action="{{ url_for('cuts.delete', cid=carcass.id) }}" onsubmit="return confirm('Delete this carcass?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>
+  {% endif %}
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('cuts.index') }}">Back</a>
+</div>
+
+<div class="stat-cards">
+  <div class="stat-card"><div class="label">Total cost</div><div class="value">{{ b.total_cost|money }}</div>
+    <div class="small text-muted">landed {{ b.landed_cost|money }}{% if b.processing_fee_per_kg %} + {{ b.processing_fee_per_kg|money }}/kg fee{% endif %}</div></div>
+  <div class="stat-card"><div class="label">Avg cost / kg</div><div class="value">{{ b.avg_cpk|money }}</div>
+    <div class="small text-muted">saleable {{ b.avg_saleable_cpk|money }}</div></div>
+  <div class="stat-card"><div class="label">Loss</div><div class="value">{{ '%.1f'|format(b.loss_pct) }}<span class="fs-6">%</span></div>
+    <div class="small text-muted">{{ '%.1f'|format(b.carcass_weight) }} kg carcass</div></div>
+  <div class="stat-card"><div class="label">Profit (local)</div><div class="value {{ 'text-success' if b.profit>=0 else 'text-danger' }}">{{ b.profit|money }}</div>
+    <div class="small text-muted">{{ '%.0f'|format(b.profit_pct) }}% of revenue</div></div>
+  {% if b.has_export %}
+  <div class="stat-card"><div class="label">Profit (export)</div><div class="value {{ 'text-success' if b.export_profit>=0 else 'text-danger' }}">{{ b.export_profit|money }}</div>
+    <div class="small text-muted">{{ '%.0f'|format(b.export_profit_pct) }}% of export revenue</div></div>
+  {% endif %}
+  {% if b.injected %}
+  <div class="stat-card"><div class="label">Profit (injected {{ '%.0f'|format(b.injection_pct*100) }}%)</div><div class="value {{ 'text-success' if b.injected_profit>=0 else 'text-danger' }}">{{ b.injected_profit|money }}</div>
+    <div class="small text-muted">{{ '%.0f'|format(b.injected_profit_pct) }}% of injected revenue</div></div>
+  {% endif %}
+</div>
+
+<form method="post" action="{{ url_for('cuts.push', cid=carcass.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="card mb-3"><div class="card-body">
+  <div class="d-flex align-items-center mb-2">
+    <h6 class="text-uppercase small text-muted mb-0">Cut breakdown</h6>
+    <span class="ms-2 badge bg-secondary">{{ 'Allocated by market value' if b.used_value else 'Allocated by weight' }}</span>
+    <div class="spacer flex-grow-1"></div>
+    {% if has_perm(current_user, 'edit_costing') %}<button class="btn btn-sm btn-rf"><i class="bi bi-arrow-up-circle"></i> Push selected to ingredients</button>{% endif %}
+  </div>
+  <table class="table table-sm align-middle">
+    <thead><tr>
+      {% if has_perm(current_user, 'edit_costing') %}<th><input type="checkbox" id="checkAll"></th>{% endif %}
+      <th>Cut</th><th class="num">Weight</th><th class="num">Yield %</th>
+      <th class="num">Cost/kg</th><th class="num">Sell/kg</th><th class="num">Margin/kg</th><th class="num">Margin %</th>
+      {% if b.has_export %}<th class="num">Export/kg</th><th class="num">Exp margin %</th>{% endif %}
+      {% if b.injected %}<th class="num">Inj wt</th>{% endif %}
+      <th>Linked ingredient</th>
+    </tr></thead>
+    <tbody>
+      {% for r in b.rows %}
+      <tr>
+        {% if has_perm(current_user, 'edit_costing') %}<td>{% if r.cut.ingredient_id %}<input type="checkbox" name="cut_id" value="{{ r.cut.id }}" class="cut-check" checked>{% endif %}</td>{% endif %}
+        <td class="fw-semibold">{{ r.name }}</td>
+        <td class="num">{{ '%.2f'|format(r.weight) }}</td>
+        <td class="num">{{ '%.1f'|format(r.yield_pct) }}%</td>
+        <td class="num text-rf fw-semibold">{{ r.cost_per_kg|money }}</td>
+        <td class="num">{{ r.selling_price|money }}</td>
+        <td class="num {{ 'text-success' if r.margin>=0 else 'text-danger' }}">{{ r.margin|money }}</td>
+        <td class="num {{ 'text-success' if r.margin_pct>=0 else 'text-danger' }}">{{ '%.0f'|format(r.margin_pct) }}%</td>
+        {% if b.has_export %}
+        <td class="num">{{ r.export_price|money if r.export_price else '—' }}</td>
+        <td class="num {{ 'text-success' if r.export_margin_pct>=0 else 'text-danger' }}">{{ ('%.0f'|format(r.export_margin_pct) ~ '%') if r.export_price else '—' }}</td>
+        {% endif %}
+        {% if b.injected %}
+        <td class="num">{% if r.injectable %}<span class="text-rf">{{ '%.2f'|format(r.injected_weight) }}</span>{% else %}{{ '%.2f'|format(r.weight) }}{% endif %}</td>
+        {% endif %}
+        <td class="small">
+          {% if r.cut.ingredient %}
+            <a href="{{ url_for('ingredients.index', q=r.cut.ingredient.name) }}" class="text-decoration-none">{{ r.cut.ingredient.name }}</a>
+            <span class="text-muted">(now {{ r.cut.ingredient.base_cost|money }})</span>
+          {% else %}<span class="text-muted">not linked</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr class="fw-semibold">
+        {% if has_perm(current_user, 'edit_costing') %}<td></td>{% endif %}
+        <td>Total cuts</td>
+        <td class="num">{{ '%.2f'|format(b.cut_weight) }}</td>
+        <td class="num">{{ '%.1f'|format(100 - b.loss_pct) }}%</td>
+        <td colspan="{{ 3 + (2 if b.has_export else 0) + (1 if b.injected else 0) }}" class="text-end">Revenue (local)</td>
+        <td class="num">{{ b.revenue|money }}</td>
+      </tr>
+    </tfoot>
+  </table>
+  <p class="small text-muted mb-0"><i class="bi bi-info-circle"></i> Pushing updates the linked ingredient's base cost to the cut's cost/kg, logs it to price history, and recalculates every recipe that uses it. Only checked, linked cuts are pushed.</p>
+</div></div>
+</form>
+{% if carcass.note %}<div class="alert alert-light small">{{ carcass.note }}</div>{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+const ca = document.getElementById('checkAll');
+if (ca) ca.addEventListener('change', () => document.querySelectorAll('.cut-check').forEach(c => c.checked = ca.checked));
+</script>
+{% endblock %}

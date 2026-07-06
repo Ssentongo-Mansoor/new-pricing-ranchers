@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block heading %}Pay a supplier{% endblock %}
+{% block content %}
+<form method="get" action="{{ url_for('accounting.payment_new') }}" class="rf-card p-3 mb-3 d-flex gap-2 align-items-end">
+  <div><label class="form-label small">Supplier</label>
+    <select class="form-select" name="supplier_id" onchange="this.form.submit()">
+      <option value="">— choose —</option>
+      {% for s in suppliers %}<option value="{{ s.id }}" {{ 'selected' if supplier and supplier.id==s.id }}>{{ s.name }} ({{ '{:,}'.format(s.balance_minor) }})</option>{% endfor %}
+    </select></div>
+</form>
+
+{% if supplier %}
+<form method="post" action="{{ url_for('accounting.payment_create') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<input type="hidden" name="supplier_id" value="{{ supplier.id }}">
+
+<div class="table-responsive rf-card mb-3">
+<table class="table table-sm align-middle mb-0">
+  <thead><tr><th>Bill</th><th>Date</th><th>Ref</th>
+    <th class="text-end">Gross</th><th class="text-end">Open</th>
+    <th class="text-end" style="width:180px">Pay now</th></tr></thead>
+  <tbody>
+  {% for b in open_bills %}
+    <tr>
+      <td class="fw-semibold">{{ b.purchase_no }}<input type="hidden" name="bill_id" value="{{ b.id }}"></td>
+      <td class="small">{{ b.purchase_date.strftime('%d %b %Y') }}</td>
+      <td class="small">{{ b.bill_ref or '—' }}</td>
+      <td class="text-end">{{ '{:,}'.format(b.gross_minor) }}</td>
+      <td class="text-end fw-semibold">{{ '{:,}'.format(b.gross_minor - (b.paid_minor or 0)) }}</td>
+      <td><input class="form-control form-control-sm text-end" name="alloc" inputmode="decimal" placeholder="0"></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6" class="text-muted text-center py-3">No open bills for this supplier.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<div class="rf-card p-3 mb-3 d-flex gap-3 align-items-end">
+  <div><label class="form-label small">Pay from</label>
+    <select class="form-select" name="method">
+      <option value="bank_ugx">Bank — UGX</option>
+      <option value="cash">Cash</option>
+      <option value="momo">Mobile Money</option>
+    </select></div>
+  <div><label class="form-label small">Note</label>
+    <input class="form-control" name="notes" maxlength="255"></div>
+  <button class="btn btn-primary"><i class="bi bi-check2"></i> Post payment</button>
+  <a class="btn btn-link" href="{{ url_for('accounting.payments') }}">Cancel</a>
+</div>
+</form>
+{% endif %}
+{% endblock %}

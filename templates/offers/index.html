@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block heading %}Quotes{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div class="btn-group btn-group-sm flex-wrap">
+    {% for v, lbl in [('active','Active'),('converted','Converted to order'),('not_ordered','Not ordered'),('archived','Archived')] %}
+    <a class="btn {{ 'btn-primary' if view==v else 'btn-outline-secondary' }}" href="{{ url_for('offers.index', view=v) }}">
+      {{ lbl }}{% if counts.get(v) %} ({{ counts[v] }}){% endif %}</a>
+    {% endfor %}
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#archModal"><i class="bi bi-archive"></i> Archive old</button>
+    <a class="btn btn-sm btn-primary" href="{{ url_for('offers.new') }}"><i class="bi bi-plus-lg"></i> New quote</a>
+  </div>
+</div>
+{% if view=='not_ordered' %}<p class="text-muted small">Past quotes the customer did not place. They keep their prices as a record; reopen one if the customer comes back.</p>{% endif %}
+
+<div class="table-responsive rf-card">
+<table class="table table-hover align-middle mb-0">
+  <thead><tr><th>Number</th><th>Customer</th><th>Currency</th><th>Status</th><th class="text-end">Total</th><th>Validity</th><th></th></tr></thead>
+  <tbody>
+  {% for o in offers %}
+    <tr>
+      <td><a href="{{ url_for('offers.detail', offer_id=o.id) }}" class="fw-semibold">{{ o.number }}</a></td>
+      <td>{{ o.customer.name }}</td>
+      <td>{{ o.currency }}</td>
+      <td>
+        {% if o.status=='issued' %}<span class="badge bg-dark">issued</span>
+        {% elif o.status=='draft' %}<span class="badge bg-secondary">draft</span>
+        {% elif o.status=='converted' %}<span class="badge badge-ok">converted</span>
+        {% elif o.status=='not_ordered' %}<span class="badge badge-warn">not ordered</span>
+        {% else %}<span class="badge bg-secondary">archived</span>{% endif %}
+      </td>
+      <td class="text-end money">{{ o.total|money(o.currency) }}</td>
+      <td>
+        {% set st = o.status_for() %}
+        {% if st=='expired' %}<span class="badge badge-danger">expired {{ o.valid_until }}</span>
+        {% elif st=='expiring' %}<span class="badge badge-warn">expiring {{ o.valid_until }}</span>
+        {% elif st=='valid' %}<span class="badge badge-ok">to {{ o.valid_until }}</span>{% endif %}
+      </td>
+      <td class="text-end">
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('offers.export', offer_id=o.id, fmt='pdf') }}"><i class="bi bi-file-earmark-pdf"></i></a>
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="7" class="text-center text-muted py-4">No quotes in this view.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<div class="modal fade" id="archModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form class="modal-content" method="post" action="{{ url_for('offers.archive_superseded') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-header"><h5 class="modal-title">Archive old quotes</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <p class="small text-muted">After a price change, archive the issued quotes made at the old prices. They are filed under “Archived” and keep their original prices as a record. Drafts are not touched.</p>
+        <label class="form-label">Archive issued quotes created before</label>
+        <input class="form-control" type="date" name="before" value="{{ today }}" required>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-link" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary">Archive them</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

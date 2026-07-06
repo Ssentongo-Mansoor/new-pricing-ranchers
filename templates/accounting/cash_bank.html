@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block heading %}Cash & bank{% endblock %}
+{% block content %}
+<div class="rf-kpis" style="grid-template-columns:repeat(4,1fr)">
+  {% for key, pair in balances.items() %}
+  <div class="rf-kpi">
+    <div class="num">{{ '{:,}'.format(pair[1]) }}</div>
+    <div class="lbl">{{ pair[0].name }}
+      {% if can_reconcile %}<br><a class="small" href="{{ url_for('accounting.reconcile', key=key) }}">reconcile</a>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if can_transfer %}
+<div class="rf-card p-3 mb-3">
+  <h6>Move money</h6>
+  <form method="post" action="{{ url_for('accounting.cash_transfer') }}" class="d-flex gap-2 flex-wrap align-items-end">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div><label class="form-label small">From</label>
+      <select class="form-select form-select-sm" name="from_key">
+        {% for key, pair in balances.items() if key != 'bank_usd' %}<option value="{{ key }}">{{ pair[0].name }}</option>{% endfor %}
+      </select></div>
+    <div><label class="form-label small">To</label>
+      <select class="form-select form-select-sm" name="to_key">
+        {% for key, pair in balances.items() if key != 'bank_usd' %}<option value="{{ key }}" {{ 'selected' if loop.index==2 }}>{{ pair[0].name }}</option>{% endfor %}
+      </select></div>
+    <div><label class="form-label small">Amount (UGX)</label>
+      <input class="form-control form-control-sm text-end" name="amount" inputmode="decimal" required></div>
+    <div><label class="form-label small">Note</label>
+      <input class="form-control form-control-sm" name="notes" placeholder="e.g. banking Friday's till"></div>
+    <button class="btn btn-sm btn-primary">Post transfer</button>
+  </form>
+  <p class="small text-muted mb-0 mt-2">Typical use: banking the shop tills —
+  Cash to Bank. USD transfers activate with the first real USD movement.</p>
+</div>
+{% endif %}
+
+<div class="d-flex gap-2">
+  <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('accounting.receipts') }}">Customer receipts</a>
+  <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('accounting.payments') }}">Supplier payments</a>
+</div>
+{% endblock %}

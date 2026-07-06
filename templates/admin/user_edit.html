@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block heading %}Admin{% endblock %}
+{% block content %}
+{% include "admin/_nav.html" %}
+<div class="rf-card p-4" style="max-width:700px">
+  <h2 class="h6 mb-3">{{ 'Edit user' if user else 'New user' }}</h2>
+  <form method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="row">
+      <div class="col-md-6 mb-3"><label class="form-label">Full name</label>
+        <input class="form-control" name="full_name" value="{{ user.full_name if user else '' }}" required></div>
+      <div class="col-md-6 mb-3"><label class="form-label">Username</label>
+        {% if user %}<input class="form-control" value="{{ user.username }}" disabled>
+        {% else %}<input class="form-control" name="username" required>{% endif %}</div>
+    </div>
+    <div class="mb-3"><label class="form-label">Email</label>
+      <input class="form-control" name="email" value="{{ user.email if user else '' }}"></div>
+    <div class="row">
+      <div class="col-md-6 mb-3"><label class="form-label">Role</label>
+        <select class="form-select" name="role" id="roleSel" onchange="toggleCust()">
+          {% for r, lbl in [('admin','Admin'),('ceo','CEO'),('manager','Manager'),('sales_director','Sales director'),('sales_manager','Sales manager'),('rep','Rep'),('order_manager','Order manager'),('fulfillment_officer','Fulfilment officer'),('telesales','Telesales'),('pricing_officer','Pricing officer'),('dispatch_officer','Dispatch officer'),('delivery','Delivery driver'),('store_manager','Store manager'),('stock_auditor','Stock auditor'),('production_manager','Production manager'),('cfo','CFO'),('finance_manager','Finance manager'),('finance_clerk','Finance clerk'),('cashier','Cashier'),('finance_viewer','Finance viewer'),('customer','Customer (portal)')] %}
+          <option value="{{ r }}" {{ 'selected' if user and user.role==r }}>{{ lbl }}</option>{% endfor %}
+        </select>
+        <div class="form-text">Order manager: works the fulfilment inbox. Telesales: calls customers and logs activity. Customer: self-service portal login for one customer.
+        Finance: CFO approves and reviews; Finance manager posts journals and runs month-end; Finance clerk captures entries without posting rights; Cashier records receipts only (cash module, Phase 5); Finance viewer is read-only for audit and investors.</div></div>
+      <div class="col-12 mb-3 {{ '' if user and user.role=='customer' else 'd-none' }}" id="custLink">
+        <label class="form-label">Primary customer (for portal login)</label>
+        <select class="form-select" name="link_customer_id">
+          <option value="">Choose…</option>
+          {% for c in customers %}<option value="{{ c.id }}" {{ 'selected' if user and user.customer_id==c.id }}>{{ c.name }}</option>{% endfor %}
+        </select>
+        <div class="form-text">The default outlet this login orders for.</div>
+        {% set outlet_ids = user.portal_customers|map(attribute='id')|list if user else [] %}
+        <label class="form-label mt-2">Other outlets this login may also order for</label>
+        <div class="input-group input-group-sm mb-2" style="max-width:340px">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input type="text" class="form-control" id="outSearch" placeholder="Search outlets…" autocomplete="off" onkeyup="outFilter()">
+        </div>
+        <div class="border rounded p-2" style="max-height:220px; overflow:auto" id="outBox">
+          <div class="row">
+          {% for c in customers %}
+            <div class="col-md-6 out-row" data-name="{{ c.name|lower }}"><div class="form-check">
+              <input class="form-check-input" type="checkbox" name="portal_customers" value="{{ c.id }}" id="po{{ c.id }}" {{ 'checked' if c.id in outlet_ids }}>
+              <label class="form-check-label" for="po{{ c.id }}">{{ c.name }}</label>
+            </div></div>
+          {% endfor %}
+          </div>
+        </div>
+        <div class="form-text">For a customer with several outlets that order separately: tick each outlet. The login picks the outlet when ordering.</div></div>
+      <div class="col-md-6 mb-3"><label class="form-label">Password {{ '(leave blank to keep)' if user else '(min 8)' }}</label>
+        <input class="form-control" type="password" name="password" {{ 'required' if not user }}></div>
+    </div>
+    <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="can_edit" id="ce" {{ 'checked' if user and user.can_edit }}>
+      <label class="form-check-label" for="ce">Edit / pricing right (can change prices &amp; exchange rates)</label></div>
+    <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="is_active" id="ia" {{ 'checked' if (user and user.is_active) or not user }}>
+      <label class="form-check-label" for="ia">Active</label></div>
+    <div class="mb-3 {{ '' if user and user.role=='rep' else 'd-none' }}" id="mgrWrap">
+      <label class="form-label">Sales manager (who this rep reports to)</label>
+      <select class="form-select" name="manager_id" style="max-width:360px">
+        <option value="">— none —</option>
+        {% for m in managers %}<option value="{{ m.id }}" {{ 'selected' if user and user.manager_id==m.id }}>{{ m.full_name }}</option>{% endfor %}
+      </select>
+      {% if not managers %}<div class="form-text">No sales managers yet. Create a user with the Sales manager role first.</div>{% endif %}
+    </div>
+    {% set all_access_roles = ['admin','ceo','manager','sales_manager','order_manager','telesales','pricing_officer'] %}
+    <div class="mb-3 {{ 'd-none' if user and user.role in all_access_roles else '' }}" id="assignWrap"><label class="form-label">Assigned customers (for reps)</label>
+      {% set assigned = user.assigned_customers|map(attribute='id')|list if user else [] %}
+      <div class="input-group input-group-sm mb-2" style="max-width:360px">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="text" class="form-control" id="acSearch" placeholder="Search customers…" autocomplete="off" onkeyup="filterAC()">
+        <button type="button" class="btn btn-outline-secondary" onclick="acShow('assigned')">Show assigned</button>
+        <button type="button" class="btn btn-outline-secondary" onclick="acShow('all')">Show all</button>
+      </div>
+      <div class="border rounded p-2" style="max-height:260px; overflow:auto" id="acBox">
+        <div class="row">
+        {% for c in customers %}
+          <div class="col-md-6 ac-row" data-name="{{ c.name|lower }}" data-assigned="{{ 1 if c.id in assigned else 0 }}"><div class="form-check">
+            <input class="form-check-input" type="checkbox" name="customers" value="{{ c.id }}"
+                   id="uc{{ c.id }}" {{ 'checked' if c.id in assigned }}>
+            <label class="form-check-label" for="uc{{ c.id }}">{{ c.name }}</label>
+          </div></div>
+        {% else %}
+          <p class="text-muted small mb-0">No customers yet — add them under the Customers tab.</p>
+        {% endfor %}
+        </div>
+      </div>
+      <div class="form-text"><span id="acCount"></span> Tick each customer this user should cover.</div></div>
+    <div class="mb-3 {{ '' if user and user.role in all_access_roles else 'd-none' }}" id="assignAllNote">
+      <div class="alert alert-secondary py-2 mb-0"><i class="bi bi-people"></i> This role automatically covers <strong>all customers</strong>. No per-customer assignment is needed.</div>
+    </div>
+    <button class="btn btn-primary">Save</button>
+    <a class="btn btn-link" href="{{ url_for('admin.users') }}">Cancel</a>
+    {% if user and user.id != current_user.id %}
+    <button type="submit" class="btn btn-outline-danger float-end" formaction="{{ url_for('admin.user_delete', user_id=user.id) }}" formnovalidate
+            onclick="return confirm('Permanently delete {{ user.full_name }}? This cannot be undone.')"><i class="bi bi-trash"></i> Delete user</button>
+    {% endif %}
+  </form>
+</div>
+<script>
+var ALL_ACCESS = ['admin','ceo','manager','sales_manager','order_manager','telesales','pricing_officer'];
+function toggleCust(){
+  var role = document.getElementById('roleSel').value;
+  document.getElementById('custLink').classList.toggle('d-none', role !== 'customer');
+  var allAccess = ALL_ACCESS.indexOf(role) !== -1 || role === 'customer';
+  var wrap = document.getElementById('assignWrap'), note = document.getElementById('assignAllNote');
+  if (wrap) wrap.classList.toggle('d-none', allAccess);
+  if (note) note.classList.toggle('d-none', !(ALL_ACCESS.indexOf(role) !== -1));
+  var mgr = document.getElementById('mgrWrap');
+  if (mgr) mgr.classList.toggle('d-none', role !== 'rep');
+}
+toggleCust();
+var acMode = 'all';
+function acApply(){
+  var q = (document.getElementById('acSearch').value || '').toLowerCase();
+  document.querySelectorAll('#acBox .ac-row').forEach(function(r){
+    var nameOk = !q || (r.getAttribute('data-name')||'').indexOf(q) > -1;
+    var modeOk = acMode === 'all' || r.getAttribute('data-assigned') === '1';
+    r.style.display = (nameOk && modeOk) ? '' : 'none';
+  });
+}
+function filterAC(){ acApply(); }
+function acShow(mode){ acMode = mode; acApply(); }
+function outFilter(){
+  var q=(document.getElementById('outSearch').value||'').toLowerCase();
+  document.querySelectorAll('#outBox .out-row').forEach(function(r){
+    r.style.display=(!q||(r.getAttribute('data-name')||'').indexOf(q)>-1)?'':'none';
+  });
+}
+var acCount = document.getElementById('acCount');
+if (acCount){
+  var n = document.querySelectorAll('#acBox .ac-row[data-assigned="1"]').length;
+  acCount.textContent = n + ' assigned.';
+}
+</script>
+{% endblock %}

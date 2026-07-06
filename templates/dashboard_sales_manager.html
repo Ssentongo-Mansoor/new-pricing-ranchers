@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block heading %}Sales team{% endblock %}
+{% macro ugx(v) %}UGX {{ '{:,.0f}'.format(v or 0) }}{% endmacro %}
+{% block content %}
+<div class="rf-hero">
+  <img class="rf-hero-logo" src="{{ url_for('static', filename='img/ranchers-logo.svg') }}" alt="">
+  <h1>Sales team — {{ label }}</h1>
+  <div class="sub">Month-to-date performance against target</div>
+</div>
+
+<div class="rf-kpis mb-3" style="grid-template-columns:repeat(4,1fr)">
+  <div class="rf-kpi"><div class="num">{{ n_reps }}</div><div class="lbl">Reps</div></div>
+  <div class="rf-kpi"><div class="num" style="color:#6E7149">{{ n_with_target }}</div><div class="lbl">With a target</div></div>
+  <div class="rf-kpi"><div class="num" style="color:#2E7D32">{{ on_track }}</div><div class="lbl">On track</div></div>
+  <div class="rf-kpi"><div class="num" style="color:#ED1C24">{{ behind }}</div><div class="lbl">Behind</div></div>
+</div>
+
+<div class="rf-card p-3 mb-3">
+  <div class="d-flex justify-content-between small mb-1">
+    <span class="fw-semibold">Team month to date: {{ ugx(team_actual) }}{% if team_target %} of {{ ugx(team_target) }}{% endif %}</span>
+    {% if team_pct is not none %}{% set tp = team_pct|round|int %}<span class="fw-semibold">{{ tp }}%</span>{% endif %}
+  </div>
+  {% if team_pct is not none %}{% set tp = team_pct|round|int %}
+  <div class="progress" style="height:20px"><div class="progress-bar {{ 'bg-success' if tp>=100 else ('bg-warning text-dark' if tp>=60 else 'bg-danger') }}" style="width:{{ 100 if tp>100 else tp }}%">{{ tp }}%</div></div>
+  {% else %}<div class="text-muted small">No targets set yet for this month.</div>{% endif %}
+</div>
+
+<div class="rf-card p-0">
+  <div class="d-flex justify-content-between align-items-center p-3 pb-2">
+    <h2 class="h6 mb-0">Reps</h2>
+    <a class="btn btn-sm btn-primary" href="{{ url_for('targets.index', ym=ym) }}"><i class="bi bi-bullseye"></i> Set targets</a>
+  </div>
+  <table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Rep</th><th class="text-end">Target</th><th class="text-end">MTD</th><th style="width:240px">Attainment</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td class="fw-semibold">{{ r.rep.full_name }}</td>
+        <td class="text-end">{% if r.target %}{{ ugx(r.target) }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+        <td class="text-end">{{ ugx(r.actual) }}</td>
+        <td>
+          {% if r.pct is not none %}{% set p = r.pct|round|int %}
+          <div class="progress" style="height:18px"><div class="progress-bar {{ 'bg-success' if p>=100 else ('bg-warning text-dark' if p>=60 else 'bg-danger') }}" style="width:{{ 100 if p>100 else p }}%">{{ p }}%</div></div>
+          {% else %}<span class="text-muted small">no target</span>{% endif %}
+        </td>
+        <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('targets.rep', rep_id=r.rep.id, ym=ym) }}">Edit</a></td>
+      </tr>
+    {% else %}<tr><td colspan="5" class="text-center text-muted py-3">No reps yet.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

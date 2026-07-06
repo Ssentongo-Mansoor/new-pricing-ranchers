@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block heading %}Store desk{% endblock %}
+{% block content %}
+
+<div class="rf-hero">
+  <img class="rf-hero-logo" src="{{ url_for('static', filename='img/ranchers-logo.svg') }}" alt="">
+  {% set hr = now.hour %}
+  <h1>{{ 'Good morning' if hr < 12 else 'Good afternoon' if hr < 17 else 'Good evening' }}, {{ current_user.full_name.split(' ')[0] }}</h1>
+  <div class="sub">{{ today.strftime('%A %d %B %Y') }} · stock at a glance</div>
+</div>
+
+{% if oos or low or low_items %}
+<div class="d-flex flex-column gap-2 mb-3">
+  {% if oos %}
+  <a class="text-decoration-none" href="{{ url_for('stock.index') }}">
+    <div class="alert alert-danger d-flex align-items-center gap-2 mb-0 py-2"><i class="bi bi-x-octagon-fill fs-5"></i>
+      <span><strong>{{ oos|length }}</strong> sellable product(s) out of stock.</span></div></a>
+  {% endif %}
+  {% if low %}
+  <a class="text-decoration-none" href="{{ url_for('stock.index') }}">
+    <div class="alert alert-warning d-flex align-items-center gap-2 mb-0 py-2"><i class="bi bi-exclamation-triangle-fill fs-5"></i>
+      <span><strong>{{ low|length }}</strong> product(s) low on stock.</span></div></a>
+  {% endif %}
+  {% if low_items %}
+  <a class="text-decoration-none" href="{{ url_for('stock.stores') }}">
+    <div class="alert alert-secondary d-flex align-items-center gap-2 mb-0 py-2"><i class="bi bi-box2 fs-5"></i>
+      <span><strong>{{ low_items|length }}</strong> store item(s) low across your stores.</span></div></a>
+  {% endif %}
+</div>
+{% else %}
+<div class="alert alert-success py-2 mb-3"><i class="bi bi-check2-circle"></i> Stock looks healthy — no shortages flagged.</div>
+{% endif %}
+
+<div class="rf-kpis mb-3" style="grid-template-columns:repeat(5,1fr)">
+  <a href="{{ url_for('stock.index') }}"><div class="rf-kpi"><div class="num">{{ n_products }}</div><div class="lbl">Sellable products</div></div></a>
+  <a href="{{ url_for('stock.index') }}"><div class="rf-kpi"><div class="num" style="color:#ED1C24">{{ oos|length }}</div><div class="lbl">Out of stock</div></div></a>
+  <a href="{{ url_for('stock.index') }}"><div class="rf-kpi"><div class="num" style="color:#F9A03F">{{ low|length }}</div><div class="lbl">Low stock</div></div></a>
+  <a href="{{ url_for('stock.index') }}"><div class="rf-kpi"><div class="num" style="color:#2E7D32">{{ ok }}</div><div class="lbl">Healthy</div></div></a>
+  <a href="{{ url_for('stock.stores') }}"><div class="rf-kpi"><div class="num">{{ stores|length }}</div><div class="lbl">Stores</div></div></a>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-5"><div class="rf-card p-3 h-100">
+    <h2 class="h6"><i class="bi bi-pie-chart text-rf-orange"></i> Sellable stock health</h2>
+    <canvas id="healthChart" height="200"></canvas></div></div>
+  <div class="col-lg-7"><div class="rf-card p-3 h-100">
+    <h2 class="h6"><i class="bi bi-arrow-left-right text-rf-orange"></i> Stock in vs out — last 14 days</h2>
+    <canvas id="mvChart" height="150"></canvas></div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6"><div class="rf-card p-3 h-100">
+    <h2 class="h6 text-danger"><i class="bi bi-x-octagon"></i> Out of stock</h2>
+    <ul class="list-group list-group-flush">
+      {% for p in oos[:12] %}
+      <li class="list-group-item px-0 d-flex justify-content-between"><span>{{ p.description }}</span><span class="small text-muted">{{ p.article_no }}</span></li>
+      {% else %}<li class="list-group-item px-0 text-muted small">None.</li>{% endfor %}
+    </ul></div></div>
+  <div class="col-lg-6"><div class="rf-card p-3 h-100">
+    <h2 class="h6"><i class="bi bi-clock-history text-rf-orange"></i> Recent stock movements</h2>
+    <table class="table table-sm align-middle mb-0">
+      <tbody>
+      {% for m in recent %}
+        <tr><td class="small">{{ m.created_at.strftime('%d %b %H:%M') if m.created_at else '' }}</td>
+          <td class="small">{{ m.product.description if m.product else '—' }}</td>
+          <td class="text-end {{ 'text-success' if (m.qty or 0)>=0 else 'text-danger' }}">{{ '%+g'|format(m.qty or 0) }}</td>
+          <td class="small text-muted">{{ m.kind }}</td></tr>
+      {% else %}<tr><td class="text-muted small">No movements yet.</td></tr>{% endfor %}
+      </tbody>
+    </table></div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script>
+const RF = {orange:'#F47A21', olive:'#6E7149', green:'#2E7D32', amber:'#F9A03F', red:'#ED1C24'};
+(function(){
+  const ctx=document.getElementById('healthChart'); if(!ctx) return;
+  new Chart(ctx,{type:'doughnut',data:{labels:['Healthy','Low','Out of stock'],
+    datasets:[{data:[{{ ok }},{{ low|length }},{{ oos|length }}],backgroundColor:[RF.green,RF.amber,RF.red]}]},
+    options:{plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11}}}}}});
+})();
+(function(){
+  const ctx=document.getElementById('mvChart'); if(!ctx) return;
+  new Chart(ctx,{type:'bar',data:{labels:{{ mv_labels|tojson }},
+    datasets:[{label:'In',data:{{ mv_in|tojson }},backgroundColor:RF.green},
+              {label:'Out',data:{{ mv_out|tojson }},backgroundColor:RF.red}]},
+    options:{plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11}}}},
+      scales:{x:{stacked:false,ticks:{maxTicksLimit:8}},y:{beginAtZero:true}}}});
+})();
+</script>
+{% endblock %}

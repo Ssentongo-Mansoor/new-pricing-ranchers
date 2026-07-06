@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <script>
+  (function(){
+    var meta=document.querySelector('meta[name=csrf-token]');
+    var _csrf=meta?meta.content:'';
+    var _origFetch=window.fetch;
+    window.fetch=function(u,o){
+      o=o||{};
+      var m=((o.method||'GET')+'').toUpperCase();
+      if(m!=='GET'&&m!=='HEAD'&&m!=='OPTIONS'&&m!=='TRACE'){
+        o.headers=Object.assign({},o.headers,{'X-CSRFToken':_csrf});
+      }
+      return _origFetch.call(this,u,o);
+    };
+  })();
+  </script>
+  <title>{{ app_name }} · Customer Portal</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/brand.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  {% if theme == 'artisanal' %}<link rel="stylesheet" href="{{ url_for('static', filename='css/brand-artisanal.css') }}">{% endif %}
+  <link rel="icon" href="{{ url_for('static', filename='img/ranchers-logo.png') }}">
+</head>
+<body class="portal-page">
+<nav class="rf-topbar" style="height:auto; padding:10px 18px; border-bottom:3px solid transparent; border-image:var(--rf-gradient) 1;">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <a href="{{ url_for('portal.home') }}" class="d-flex align-items-center gap-2 text-decoration-none">
+      <img src="{{ url_for('static', filename='img/ranchers-logo.svg') }}" style="height:60px" alt="{{ company_name }}">
+      <span class="text-white fw-semibold rf-head d-none d-sm-inline">Customer Portal</span>
+    </a>
+    <div class="d-flex align-items-center gap-3">
+      {% set ep = request.endpoint or '' %}
+      <a class="nav-link d-inline {{ 'text-warning' if ep=='portal.home' else 'text-white' }}" href="{{ url_for('portal.home') }}">Home</a>
+      <a class="nav-link d-inline {{ 'text-warning' if 'pricelist' in ep else 'text-white' }}" href="{{ url_for('portal.pricelist') }}">My Pricelist</a>
+      <a class="nav-link d-inline {{ 'text-warning' if ep.startswith('catalogue') else 'text-white' }}" href="{{ url_for('catalogue.view') }}">Catalogue</a>
+      <a class="nav-link d-inline {{ 'text-warning' if ep=='portal.order_new' else 'text-white' }}" href="{{ url_for('portal.order_new') }}">New Order</a>
+      <a class="nav-link d-inline {{ 'text-warning' if ep=='portal.messages' else 'text-white' }}" href="{{ url_for('portal.messages') }}">Messages{% if portal_unread %} <span class="badge badge-danger">{{ portal_unread }}</span>{% endif %}</a>
+      {% if portal_outlets|length > 1 %}
+      <form method="post" action="{{ url_for('portal.switch_outlet') }}" class="m-0">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <select class="form-select form-select-sm" name="cust" onchange="this.form.submit()" title="Ordering for outlet" style="max-width:200px">
+          {% for o in portal_outlets %}<option value="{{ o.id }}" {{ 'selected' if o.id==portal_active_id }}>{{ o.name }}</option>{% endfor %}
+        </select>
+      </form>
+      {% else %}
+      <span class="text-white small d-none d-md-inline"><i class="bi bi-person-circle"></i> {{ current_user.customer.name if current_user.customer else current_user.full_name }}</span>
+      {% endif %}
+      <a class="text-white" href="{{ url_for('portal.account') }}" title="My account"><i class="bi bi-gear"></i></a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right"></i></a>
+    </div>
+  </div>
+</nav>
+
+<main class="rf-content container py-4">
+  {% block content %}{% endblock %}
+</main>
+
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="toast align-items-center text-bg-{{ 'danger' if category=='danger' else 'success' if category=='success' else 'warning' if category=='warning' else 'secondary' }} border-0 show" role="alert">
+      <div class="d-flex"><div class="toast-body">{{ message }}</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>
+    </div>
+    {% endfor %}
+  {% endwith %}
+</div>
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+<script>document.querySelectorAll('.toast').forEach(t=>setTimeout(()=>{try{bootstrap.Toast.getOrCreateInstance(t).hide()}catch(e){}},4500));</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

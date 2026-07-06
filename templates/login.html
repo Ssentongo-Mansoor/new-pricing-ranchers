@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block fullpage %}
+<div class="rf-login-wrap">
+  <div class="rf-login-card">
+    <div class="rf-login-banner" {% if login_image %}style="background-image:linear-gradient(rgba(14,14,14,.35),rgba(14,14,14,.45)), url('{{ url_for('auth.login_image') }}'); background-size:cover; background-position:center;"{% endif %}>
+      <img src="{{ url_for('static', filename='img/ranchers-logo.svg') }}" alt="{{ company_name }}">
+    </div>
+    <div class="rf-login-body">
+      <h1 class="h5 text-center mb-1 rf-head">{{ app_name }}</h1>
+      <p class="text-center text-muted small mb-3">{{ company_name }}</p>
+      <form method="post" action="{{ url_for('auth.login') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-3">
+          <label class="form-label">Username</label>
+          <input class="form-control" name="username" autofocus required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Password</label>
+          <input class="form-control" type="password" name="password" required>
+        </div>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" name="remember" id="remember">
+          <label class="form-check-label" for="remember">Remember me for 30 days</label>
+        </div>
+        <button class="btn btn-primary w-100">Sign in</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

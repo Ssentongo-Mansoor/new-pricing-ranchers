@@ -1,0 +1,16 @@
+{% set ep = request.endpoint or '' %}
+<ul class="nav nav-pills mb-3 flex-wrap gap-1">
+  <li class="nav-item"><a class="nav-link {{ 'active' if 'user' in ep }}" href="{{ url_for('admin.users') }}">Users</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if 'permission' in ep }}" href="{{ url_for('admin.permissions') }}">Permissions</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if ep.endswith('categories') and 'customer' not in ep }}" href="{{ url_for('admin.categories') }}">Product categories</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if 'customer_categ' in ep }}" href="{{ url_for('admin.customer_categories') }}">Customer categories</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if 'settings' in ep }}" href="{{ url_for('admin.settings') }}">Settings</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if 'features' in ep }}" href="{{ url_for('admin.features') }}">Features</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('exchange_rates') }}" href="{{ url_for('exchange_rates.index') }}">Exchange rates</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if 'audit' in ep }}" href="{{ url_for('admin.audit') }}">Audit log</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if 'sales_import' in ep }}" href="{{ url_for('admin.sales_import') }}">Import daily sales</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('catalogue') }}" href="{{ url_for('catalogue.manage') }}">Catalogue</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if ep.endswith('upload') or 'upload_' in ep }}" href="{{ url_for('admin.upload') }}">Upload pricelist</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if 'import_reports' in ep }}" href="{{ url_for('admin.import_reports') }}">Import reports</a></li>
+  <li class="nav-item"><a class="nav-link" href="{{ url_for('orders.index') }}"><i class="bi bi-inbox"></i> Order fulfilment inbox</a></li>
+</ul>

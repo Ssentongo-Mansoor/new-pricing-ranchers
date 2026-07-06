@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block heading %}Invoices{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <form class="d-flex gap-2" method="get">
+    <select class="form-select form-select-sm" name="efris" onchange="this.form.submit()">
+      <option value="">All EFRIS states</option>
+      {% for s in ['pending','fiscalized','failed'] %}<option value="{{ s }}" {{ 'selected' if s==efris }}>{{ s|title }}</option>{% endfor %}
+    </select>
+  </form>
+  <div class="d-flex gap-2 align-items-center">
+    {% if queue_pending %}
+    <span class="badge badge-warn">{{ queue_pending }} in EFRIS queue</span>
+    {% if can_post %}
+    <form method="post" action="{{ url_for('accounting.efris_retry') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-repeat"></i> Retry now</button>
+    </form>
+    {% endif %}
+    {% endif %}
+    {% if uninvoiced and can_post %}
+    <form method="post" action="{{ url_for('accounting.invoices_backfill') }}"
+          onsubmit="return confirm('Post invoices for {{ uninvoiced|length }} completed order(s) that predate the accounting module?');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-sm btn-outline-primary"><i class="bi bi-box-arrow-in-down"></i> Backfill {{ uninvoiced|length }} completed order(s)</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="table-responsive rf-card">
+<table class="table table-sm table-hover align-middle mb-0">
+  <thead><tr><th>No</th><th>Kind</th><th>Date</th><th>Customer</th><th>Order</th>
+    <th class="text-end">Net</th><th class="text-end">VAT</th><th class="text-end">Gross</th>
+    <th>Ccy</th><th>EFRIS</th></tr></thead>
+  <tbody>
+  {% for i in invoices %}
+    <tr onclick="window.location='{{ url_for('accounting.invoice_view', inv_id=i.id) }}'" style="cursor:pointer">
+      <td class="fw-semibold">{{ i.invoice_no }}</td>
+      <td class="small">{% if i.is_credit_note %}<span class="badge bg-secondary">Credit note</span>{% else %}Invoice{% endif %}
+        {% if i.status == 'credited' %}<span class="badge badge-warn">credited</span>{% endif %}</td>
+      <td class="small">{{ i.invoice_date.strftime('%d %b %Y') }}</td>
+      <td class="small">{{ i.buyer_name or '—' }}</td>
+      <td class="small">{{ i.order.number if i.order else '—' }}</td>
+      <td class="text-end">{{ '{:,}'.format(i.net_minor) }}</td>
+      <td class="text-end">{{ '{:,}'.format(i.vat_minor) }}</td>
+      <td class="text-end fw-semibold">{{ '{:,}'.format(i.gross_minor) }}</td>
+      <td class="small">{{ i.currency }}</td>
+      <td>
+        {% if i.efris_status == 'fiscalized' %}<span class="badge badge-ok" title="FDN {{ i.efris_fdn }}">Fiscalized</span>
+        {% elif i.efris_status == 'failed' %}<span class="badge badge-danger">Failed</span>
+        {% else %}<span class="badge badge-warn">Pending</span>{% endif %}
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="10" class="text-center text-muted py-4">No invoices yet.
+      Invoices post automatically when fulfilment completes an order.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% if pages > 1 %}
+<nav class="mt-3"><ul class="pagination pagination-sm">
+  {% for p in range(1, pages + 1) %}
+  <li class="page-item {{ 'active' if p==page }}"><a class="page-link" href="{{ url_for('accounting.invoices', page=p, efris=efris) }}">{{ p }}</a></li>
+  {% endfor %}
+</ul></nav>
+{% endif %}
+<p class="small text-muted mt-2">Amounts are shown in each document's own currency
+(minor units already applied). The ledger books every invoice in UGX at the
+stamped rate. A fiscalized invoice is corrected only by a credit note.</p>
+{% endblock %}

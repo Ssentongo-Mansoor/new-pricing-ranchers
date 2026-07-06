@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block heading %}Financial reports{% endblock %}
+{% block content %}
+{% include "accounting/_tb_badge.html" %}
+<div class="rf-kpis" style="grid-template-columns:repeat(3,1fr)">
+  <a href="{{ url_for('accounting.report_pl') }}"><div class="rf-kpi"><div class="num"><i class="bi bi-graph-up"></i></div><div class="lbl">Profit &amp; loss<br><span class="small">true gross margin, this month</span></div></div></a>
+  <a href="{{ url_for('accounting.report_bs') }}"><div class="rf-kpi"><div class="num"><i class="bi bi-columns-gap"></i></div><div class="lbl">Balance sheet<br><span class="small">as of today</span></div></div></a>
+  <a href="{{ url_for('accounting.report_cf') }}"><div class="rf-kpi"><div class="num"><i class="bi bi-cash-stack"></i></div><div class="lbl">Cash flow<br><span class="small">direct, money accounts</span></div></div></a>
+  <a href="{{ url_for('accounting.inventory') }}"><div class="rf-kpi"><div class="num"><i class="bi bi-box-seam"></i></div><div class="lbl">Inventory valuation<br><span class="small">subledger vs GL</span></div></div></a>
+  <a href="{{ url_for('accounting.report_vat') }}"><div class="rf-kpi"><div class="num"><i class="bi bi-percent"></i></div><div class="lbl">VAT summary<br><span class="small">reconciled to EFRIS</span></div></div></a>
+  <a href="{{ url_for('accounting.report_ar') }}"><div class="rf-kpi"><div class="num"><i class="bi bi-hourglass-split"></i></div><div class="lbl">Aged receivables<br><span class="small">and <a href="{{ url_for('accounting.report_ap') }}">payables</a></span></div></div></a>
+</div>
+{% endblock %}

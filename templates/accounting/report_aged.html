@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block heading %}Aged {{ kind }}{% endblock %}
+{% block content %}
+{% include "accounting/_tb_badge.html" %}
+<p class="small">
+{% if r.tied %}<span class="badge badge-ok">Total equals the {{ 'AR' if kind == 'receivables' else 'AP' }} control account ✓</span>
+{% else %}<span class="badge badge-danger">Differs from control account {{ '{:,}'.format(r.gl) }}</span>{% endif %}
+</p>
+
+<div class="table-responsive rf-card">
+<table class="table table-sm table-hover align-middle mb-0">
+  <thead><tr><th>{{ 'Customer' if kind == 'receivables' else 'Supplier' }}</th>
+    {% for b in buckets %}<th class="text-end">{{ b }} days</th>{% endfor %}
+    <th class="text-end">Total (UGX)</th></tr></thead>
+  <tbody>
+  {% for row in r.rows %}
+    <tr>
+      <td>{{ row.name }}</td>
+      {% for b in buckets %}
+      <td class="text-end {{ 'text-danger fw-semibold' if b == '90+' and row[b] }}">{{ '{:,}'.format(row[b]) if row[b] else '' }}</td>
+      {% endfor %}
+      <td class="text-end fw-semibold">{{ '{:,}'.format(row.total) }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="{{ buckets|length + 2 }}" class="text-center text-muted py-4">Nothing outstanding. Clean book.</td></tr>
+  {% endfor %}
+  </tbody>
+  <tfoot><tr class="fw-semibold">
+    <td>Total</td>
+    {% for b in buckets %}<td class="text-end">{{ '{:,}'.format(r.bucket_totals[b]) }}</td>{% endfor %}
+    <td class="text-end">{{ '{:,}'.format(r.total) }}</td>
+  </tr></tfoot>
+</table>
+</div>
+<a class="btn btn-link px-0 mt-2" href="{{ url_for('accounting.fin_reports') }}">&larr; All reports</a>
+{% endblock %}

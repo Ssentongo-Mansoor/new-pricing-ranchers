@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block heading %}Purchase {{ purchase.purchase_no }}{% endblock %}
+{% block content %}
+<div class="rf-card p-3 mb-3">
+  <div class="row small">
+    <div class="col-md-3"><span class="text-muted">Supplier</span><br>{{ purchase.supplier.name }}
+      {% if purchase.supplier.tin %}<br><span class="text-muted">TIN {{ purchase.supplier.tin }}</span>{% endif %}</div>
+    <div class="col-md-2"><span class="text-muted">Date</span><br>{{ purchase.purchase_date.strftime('%d %b %Y') }}
+      {% if purchase.bill_ref %}<br><span class="text-muted">ref {{ purchase.bill_ref }}</span>{% endif %}</div>
+    <div class="col-md-2"><span class="text-muted">Settled</span><br>{{ purchase.PAY_FROM.get(purchase.pay_from) }}</div>
+    <div class="col-md-2"><span class="text-muted">Journal</span><br>
+      {% if purchase.journal_entry %}<a href="{{ url_for('accounting.journal_view', entry_id=purchase.journal_entry_id) }}">{{ purchase.journal_entry.entry_no }}</a>{% endif %}
+      {% if purchase.reversal_entry %}<br><span class="text-danger">reversed by <a href="{{ url_for('accounting.journal_view', entry_id=purchase.reversal_entry_id) }}">{{ purchase.reversal_entry.entry_no }}</a></span>{% endif %}</div>
+    <div class="col-md-3"><span class="text-muted">Totals ({{ purchase.currency }})</span><br>
+      Net {{ '{:,}'.format(purchase.net_minor) }} · VAT {{ '{:,}'.format(purchase.vat_minor) }} ·
+      <strong>Gross {{ '{:,}'.format(purchase.gross_minor) }}</strong></div>
+  </div>
+</div>
+
+<div class="table-responsive rf-card">
+<table class="table table-sm align-middle mb-0">
+  <thead><tr><th>Type</th><th>Line</th><th class="text-end">Qty</th>
+    <th class="text-end">Unit cost</th><th class="text-end">Net</th><th class="text-end">VAT</th></tr></thead>
+  <tbody>
+  {% for l in purchase.lines %}
+    <tr>
+      <td class="small">{{ 'Stock' if l.line_type == 'stock' else 'Expense' }}</td>
+      <td>{{ l.description }}{% if l.expense_account %} <span class="text-muted small">({{ l.expense_account.code }})</span>{% endif %}
+        {% if l.item %} <a class="small" href="{{ url_for('accounting.inventory_item', item_id=l.item_id) }}">item</a>{% endif %}</td>
+      <td class="text-end">{{ '%g'|format(l.qty) if l.qty else '' }}</td>
+      <td class="text-end">{{ '{:,}'.format(l.unit_cost_minor) if l.unit_cost_minor else '' }}</td>
+      <td class="text-end">{{ '{:,}'.format(l.net_minor) }}</td>
+      <td class="text-end">{{ '{:,}'.format(l.vat_minor) if l.vat_minor else '' }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if can_reverse and purchase.status == 'posted' %}
+<form method="post" action="{{ url_for('accounting.purchase_reverse', pid=purchase.id) }}" class="mt-3 d-flex gap-2"
+      onsubmit="return confirm('Reverse {{ purchase.purchase_no }} in full? The journal mirrors and any stock goes back out.');">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input class="form-control" name="reason" style="max-width:400px" placeholder="Reason (audit trail)">
+  <button class="btn btn-outline-danger"><i class="bi bi-arrow-counterclockwise"></i> Reverse purchase</button>
+</form>
+{% endif %}
+
+<a class="btn btn-link mt-3 px-0" href="{{ url_for('accounting.purchases') }}">&larr; Back to purchases</a>
+{% endblock %}

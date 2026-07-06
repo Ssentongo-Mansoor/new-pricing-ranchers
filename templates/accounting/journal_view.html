@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block heading %}Journal {{ entry.entry_no or '(draft)' }}{% endblock %}
+{% block content %}
+<div class="rf-card p-3 mb-3">
+  <div class="row small">
+    <div class="col-md-2"><span class="text-muted">Date</span><br>{{ entry.entry_date.strftime('%d %b %Y') }}</div>
+    <div class="col-md-4"><span class="text-muted">Memo</span><br>{{ entry.memo or '—' }}</div>
+    <div class="col-md-2"><span class="text-muted">Source</span><br>{{ entry.source_type|replace('_',' ')|title }}{% if entry.source_id %} #{{ entry.source_id }}{% endif %}</div>
+    <div class="col-md-2"><span class="text-muted">Status</span><br>
+      {% if entry.posted %}<span class="badge badge-ok">Posted {{ entry.posted_at.strftime('%d %b %H:%M') if entry.posted_at }}</span>
+      {% else %}<span class="badge badge-warn">Draft</span>{% endif %}</div>
+    <div class="col-md-2"><span class="text-muted">By</span><br>{{ entry.created_by.full_name if entry.created_by else '—' }}</div>
+  </div>
+  {% if entry.reversal_of %}
+  <div class="small mt-2">Reverses <a href="{{ url_for('accounting.journal_view', entry_id=entry.reversal_of.id) }}">{{ entry.reversal_of.entry_no }}</a></div>
+  {% endif %}
+  {% for r in entry.reversals %}
+  <div class="small mt-2 text-danger">Reversed by <a href="{{ url_for('accounting.journal_view', entry_id=r.id) }}">{{ r.entry_no }}</a></div>
+  {% endfor %}
+</div>
+
+<div class="table-responsive rf-card">
+<table class="table table-sm align-middle mb-0">
+  <thead><tr><th>Account</th><th class="text-end">Debit (UGX)</th><th class="text-end">Credit (UGX)</th><th>Note</th><th>FX</th></tr></thead>
+  <tbody>
+  {% for l in entry.lines %}
+    <tr>
+      <td>{{ l.account.code }} · {{ l.account.name }}</td>
+      <td class="text-end">{{ '{:,}'.format(l.debit) if l.debit else '' }}</td>
+      <td class="text-end">{{ '{:,}'.format(l.credit) if l.credit else '' }}</td>
+      <td class="small">{{ l.line_memo or '' }}</td>
+      <td class="small">{% if l.orig_currency %}{{ l.orig_currency }} {{ '%.2f'|format((l.orig_amount_minor or 0)/100) }} @ {{ l.fx_rate }}{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+  <tfoot><tr class="fw-semibold">
+    <td class="text-end">Totals</td>
+    <td class="text-end">{{ '{:,}'.format(entry.total_debit) }}</td>
+    <td class="text-end">{{ '{:,}'.format(entry.total_credit) }}</td>
+    <td colspan="2">{% if entry.is_balanced %}<span class="text-success small">Balanced ✓</span>{% endif %}</td>
+  </tr></tfoot>
+</table>
+</div>
+
+{% if can_post and entry.posted and not entry.reversals %}
+<form method="post" action="{{ url_for('accounting.journal_reverse', entry_id=entry.id) }}" class="mt-3 d-flex gap-2"
+      onsubmit="return confirm('Post a reversing entry for {{ entry.entry_no }}? The original stays on the books.');">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input class="form-control" name="memo" style="max-width:400px" placeholder="Reason for reversal (optional)">
+  <button class="btn btn-outline-danger"><i class="bi bi-arrow-counterclockwise"></i> Reverse this entry</button>
+</form>
+{% endif %}
+
+<a class="btn btn-link mt-3 px-0" href="{{ url_for('accounting.journal') }}">&larr; Back to journal</a>
+{% endblock %}

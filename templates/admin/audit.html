@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block heading %}Admin{% endblock %}
+{% block content %}
+{% include "admin/_nav.html" %}
+<div class="d-flex justify-content-between align-items-end mb-3">
+  <form class="row g-2" method="get">
+    <div class="col-auto"><select class="form-select form-select-sm" name="action" onchange="this.form.submit()">
+      <option value="">All actions</option>
+      {% for a in actions %}<option value="{{ a }}" {{ 'selected' if a==sel_action }}>{{ a }}</option>{% endfor %}
+    </select></div>
+    <div class="col-auto"><select class="form-select form-select-sm" name="user" onchange="this.form.submit()">
+      <option value="">All users</option>
+      {% for u in users %}<option value="{{ u.id }}" {{ 'selected' if sel_user==(u.id|string) }}>{{ u.full_name }}</option>{% endfor %}
+    </select></div>
+  </form>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.audit_export') }}"><i class="bi bi-download"></i> Export CSV</a>
+</div>
+<div class="table-responsive rf-card">
+<table class="table table-sm align-middle mb-0">
+  <thead><tr><th>When</th><th>User</th><th>Action</th><th>Entity</th><th>Field</th><th>Old</th><th>New</th><th>Detail</th></tr></thead>
+  <tbody>
+  {% for e in entries %}
+    <tr>
+      <td class="small text-nowrap">{{ e.ts.strftime('%Y-%m-%d %H:%M') }}</td>
+      <td class="small">{{ e.username or '—' }}</td>
+      <td class="small">{{ e.action }}</td>
+      <td class="small">{{ e.entity_type }} {{ e.entity_id or '' }}</td>
+      <td class="small">{{ e.field or '' }}</td>
+      <td class="small">{{ e.old_value or '' }}</td>
+      <td class="small fw-semibold">{{ e.new_value or '' }}</td>
+      <td class="small text-muted">{{ e.detail or '' }}</td>
+    </tr>
+  {% else %}<tr><td colspan="8" class="text-center text-muted py-4">No log entries.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

@@ -1,0 +1,5 @@
+{% set ep = request.endpoint or '' %}
+<ul class="nav nav-pills mb-3 gap-1">
+  <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('pricelists') }}" href="{{ url_for('pricelists.index') }}"><i class="bi bi-card-list"></i> Generic pricelists</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('customer_pricelists') }}" href="{{ url_for('customer_pricelists.index') }}"><i class="bi bi-people"></i> Customer pricelists</a></li>
+</ul>

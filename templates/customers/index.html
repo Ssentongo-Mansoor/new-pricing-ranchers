@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block heading %}Customers{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <p class="text-muted mb-0">{% if show_archived %}Archived customers.{% else %}Trade customers (supermarkets, hotels, cafés…). Distributors are under their own tab.{% endif %}</p>
+  <div class="d-flex gap-2">
+    {% if show_archived %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('customers.index') }}"><i class="bi bi-arrow-left"></i> Active</a>
+    {% else %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('customers.index', archived=1) }}"><i class="bi bi-archive"></i> Archived{% if n_archived %} ({{ n_archived }}){% endif %}</a>{% endif %}
+    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('customers.export_form') }}"><i class="bi bi-file-earmark-excel"></i> Export</a>
+    {% if current_user.can_manage_all or current_user.is_pricing_officer %}
+      <a class="btn btn-primary btn-sm" href="{{ url_for('customers.new') }}"><i class="bi bi-plus-lg"></i> New customer</a>
+    {% elif current_user.role in ['rep','telesales','order_manager'] %}
+      <a class="btn btn-primary btn-sm" href="{{ url_for('customers.onboard') }}"><i class="bi bi-person-plus"></i> Register customer</a>
+    {% endif %}
+  </div>
+</div>
+{% if not show_archived %}
+<ul class="nav nav-pills mb-3 flex-wrap gap-1">
+  <li class="nav-item"><a class="nav-link {{ 'active' if status=='active' }}" href="{{ url_for('customers.index', status='active', category=cat) }}">Active <span class="badge bg-light text-dark">{{ n_active }}</span></a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if status=='inactive' }}" href="{{ url_for('customers.index', status='inactive', category=cat) }}">Not active <span class="badge bg-light text-dark">{{ n_inactive }}</span></a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if status=='all' }}" href="{{ url_for('customers.index', status='all', category=cat) }}">All <span class="badge bg-light text-dark">{{ n_active + n_inactive }}</span></a></li>
+</ul>
+<p class="text-muted small mb-2">Active means a purchase in the last 6 months (from sales history and live orders).</p>
+{% endif %}
+<div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+  <div class="input-group" style="max-width:360px">
+    <span class="input-group-text"><i class="bi bi-search"></i></span>
+    <input type="text" id="custSearch" class="form-control" placeholder="Search customers by name, contact or phone…" autofocus autocomplete="off">
+  </div>
+  <form method="get" class="m-0">
+    <div class="input-group" style="max-width:300px">
+      <span class="input-group-text">Category</span>
+      <select class="form-select" name="category" onchange="this.form.submit()">
+        <option value="">All categories</option>
+        {% for ct in categories %}<option value="{{ ct.id }}" {{ 'selected' if ct.id==cat }}>{{ ct.name }}</option>{% endfor %}
+      </select>
+    </div>
+  </form>
+  <span class="text-muted small ms-auto" id="custCount">{{ customers|length }} customer{{ '' if customers|length == 1 else 's' }}</span>
+</div>
+<div class="table-responsive rf-card">
+<table class="table table-hover align-middle mb-0">
+  <thead><tr><th>Name</th><th>Status</th><th>Category</th><th>Contact</th><th>Market</th><th>Reps</th></tr></thead>
+  <tbody id="custRows">
+  {% for c in customers %}
+    <tr data-search="{{ (c.name ~ ' ' ~ (c.contact_name or '') ~ ' ' ~ (c.phone or '') ~ ' ' ~ (c.category.name if c.category else ''))|lower }}">
+      <td><a href="{{ url_for('customers.detail', customer_id=c.id) }}" class="fw-semibold">{{ c.name }}</a></td>
+      <td>{% if c.id in active_ids %}<span class="badge bg-success">active</span>{% else %}<span class="badge bg-secondary">not active</span>{% endif %}</td>
+      <td class="small">{{ c.category.name if c.category else '—' }}</td>
+      <td class="small">{{ c.contact_name or '' }}{% if c.phone %} · {{ c.phone }}{% endif %}</td>
+      <td class="text-capitalize">{{ c.market }}</td>
+      <td class="small">{{ c.reps|map(attribute='full_name')|join(', ') or '—' }}</td>
+    </tr>
+  {% else %}<tr><td colspan="6" class="text-center text-muted py-4">No customers visible.</td></tr>{% endfor %}
+  <tr id="custNoMatch" class="d-none"><td colspan="6" class="text-center text-muted py-4">No customers match your search.</td></tr>
+  </tbody>
+</table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  var box = document.getElementById('custSearch');
+  var rows = Array.prototype.slice.call(document.querySelectorAll('#custRows tr[data-search]'));
+  var count = document.getElementById('custCount');
+  var noMatch = document.getElementById('custNoMatch');
+  var total = rows.length;
+  function apply(){
+    var q = box.value.trim().toLowerCase();
+    var shown = 0;
+    rows.forEach(function(r){
+      var ok = !q || r.getAttribute('data-search').indexOf(q) !== -1;
+      r.classList.toggle('d-none', !ok);
+      if(ok) shown++;
+    });
+    noMatch.classList.toggle('d-none', shown !== 0);
+    count.textContent = (q ? shown + ' of ' + total : total) + ' customer' + (total === 1 ? '' : 's');
+  }
+  box.addEventListener('input', apply);
+})();
+</script>
+{% endblock %}

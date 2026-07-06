@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block heading %}VAT summary{% endblock %}
+{% block content %}
+{% include "accounting/_tb_badge.html" %}
+{% include "accounting/_period_form.html" %}
+
+<div class="rf-kpis" style="grid-template-columns:repeat(3,1fr)">
+  <div class="rf-kpi"><div class="num">{{ '{:,}'.format(r.output_vat) }}</div><div class="lbl">Output VAT (sales)</div></div>
+  <div class="rf-kpi"><div class="num">{{ '{:,}'.format(r.input_vat) }}</div><div class="lbl">Input VAT (purchases)</div></div>
+  <div class="rf-kpi"><div class="num">{{ '{:,}'.format(r.net_vat) }}</div><div class="lbl">Net {{ 'payable to URA' if r.net_vat >= 0 else 'claimable' }}</div></div>
+</div>
+
+<div class="rf-card p-3 mb-3">
+  <h6>Output — every fiscal document, reconciled to EFRIS
+    <span class="badge badge-ok ms-2">{{ r.fiscalized }} fiscalized</span>
+    {% if r.pending %}<span class="badge badge-warn">{{ r.pending }} pending</span>{% endif %}</h6>
+  <div class="table-responsive">
+  <table class="table table-sm table-hover mb-0">
+    <thead><tr><th>Document</th><th>Date</th><th>Customer</th>
+      <th class="text-end">VAT (UGX)</th><th>EFRIS FDN</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for i, vat_ugx in r.invoices %}
+      <tr>
+        <td><a href="{{ url_for('accounting.invoice_view', inv_id=i.id) }}">{{ i.invoice_no }}</a></td>
+        <td class="small">{{ i.invoice_date.strftime('%d %b') }}</td>
+        <td class="small">{{ i.buyer_name or '—' }}</td>
+        <td class="text-end {{ 'text-danger' if vat_ugx < 0 }}">{{ '{:,}'.format(vat_ugx) }}</td>
+        <td class="small">{{ i.efris_fdn or '—' }}</td>
+        <td>{% if i.efris_status == 'fiscalized' %}<span class="badge badge-ok">OK</span>
+            {% else %}<span class="badge badge-warn">{{ i.efris_status }}</span>{% endif %}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6" class="text-muted text-center py-3">No fiscal documents in the period.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{% if r.shop_sales %}
+<div class="rf-card p-3 mb-3">
+  <h6>Output — own-shop daily sales <span class="small text-muted">(fiscalized at the shop POS; no FDN in this system)</span></h6>
+  <div class="table-responsive">
+  <table class="table table-sm mb-0">
+    <thead><tr><th>Summary</th><th>Date</th><th>Shop</th>
+      <th class="text-end">Gross</th><th class="text-end">VAT (UGX)</th></tr></thead>
+    <tbody>
+    {% for s in r.shop_sales %}
+      <tr>
+        <td>{{ s.sale_no }}</td>
+        <td class="small">{{ s.sale_date.strftime('%d %b') }}</td>
+        <td class="small">{{ s.location.name }}</td>
+        <td class="text-end">{{ '{:,}'.format(s.gross_minor) }}</td>
+        <td class="text-end">{{ '{:,}'.format(s.vat_minor) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr class="fw-semibold"><td colspan="4" class="text-end">Shop VAT</td>
+      <td class="text-end">{{ '{:,}'.format(r.shop_vat) }}</td></tr></tfoot>
+  </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="rf-card p-3">
+  <h6>Input — supplier bills with VAT</h6>
+  <div class="table-responsive">
+  <table class="table table-sm mb-0">
+    <thead><tr><th>Bill</th><th>Date</th><th>Supplier</th><th class="text-end">VAT (UGX)</th></tr></thead>
+    <tbody>
+    {% for p in r.purchases if p.vat_minor %}
+      <tr>
+        <td><a href="{{ url_for('accounting.purchase_view', pid=p.id) }}">{{ p.purchase_no }}</a></td>
+        <td class="small">{{ p.purchase_date.strftime('%d %b') }}</td>
+        <td class="small">{{ p.supplier.name }}</td>
+        <td class="text-end">{{ '{:,}'.format(p.vat_minor) }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="4" class="text-muted text-center py-3">No input VAT in the period.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+<p class="small text-muted mt-2">Pending documents still count in output VAT —
+the liability exists from the sale, not from URA's confirmation. Chase the
+pending queue before filing.</p>
+<a class="btn btn-link px-0" href="{{ url_for('accounting.fin_reports') }}">&larr; All reports</a>
+{% endblock %}

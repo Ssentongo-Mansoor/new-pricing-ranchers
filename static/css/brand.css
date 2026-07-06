@@ -1,0 +1,92 @@
+/* Ranchers Finest — brand palette & typography.
+   Bundled locally (fonts under static/fonts). No external CDN. */
+
+/* ---- Fonts (bundled) ---- */
+@font-face {
+  font-family: "RF Heading";
+  src: url("../fonts/montserrat-latin-700-normal.woff2") format("woff2");
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "RF Heading";
+  src: url("../fonts/montserrat-latin-600-normal.woff2") format("woff2");
+  font-weight: 600; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "RF Body";
+  src: url("../fonts/open-sans-latin-400-normal.woff2") format("woff2");
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "RF Body";
+  src: url("../fonts/open-sans-latin-600-normal.woff2") format("woff2");
+  font-weight: 600; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "RF Body";
+  src: url("../fonts/open-sans-latin-700-normal.woff2") format("woff2");
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+
+:root {
+  /* Core brand */
+  --rf-orange:        #F47A21;
+  --rf-red:           #ED1C24;
+  --rf-amber:         #F9A03F;
+  --rf-ink:           #0E0E0E;
+  --rf-charcoal:      #2B2B2B;
+  --rf-cream:         #FDF1E5;
+  --rf-white:         #FFFFFF;
+
+  --rf-gradient: linear-gradient(90deg, #ED1C24 0%, #F47A21 50%, #F9A03F 100%);
+
+  --rf-ok:     #2E7D32;
+  --rf-warn:   #F9A03F;
+  --rf-danger: #ED1C24;
+
+  /* Bootstrap overrides */
+  --bs-primary:       #F47A21;
+  --bs-primary-rgb:   244, 122, 33;
+  --bs-body-bg:       #FDF1E5;
+  --bs-body-color:    #2B2B2B;
+  --bs-link-color:    #ED1C24;
+  --bs-link-hover-color: #c41119;
+  --bs-font-sans-serif: "RF Body", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+body { font-family: var(--rf-body, "RF Body"), system-ui, sans-serif; background: var(--rf-cream); }
+h1, h2, h3, h4, h5, h6, .rf-head { font-family: "RF Heading", system-ui, sans-serif; font-weight: 700; color: var(--rf-charcoal); }
+
+/* Sidebar / top bar: dark so the white logo reads */
+.rf-sidebar, .rf-topbar { background: var(--rf-ink); color: var(--rf-white); }
+.rf-header-band, .rf-login-banner { background: var(--rf-gradient); }
+
+/* Buttons */
+.btn-primary {
+  --bs-btn-bg: var(--rf-orange);
+  --bs-btn-border-color: var(--rf-orange);
+  --bs-btn-hover-bg: #d96a17;
+  --bs-btn-hover-border-color: #d96a17;
+  --bs-btn-active-bg: #c45f14;
+  --bs-btn-color: #fff;
+  --bs-btn-hover-color: #fff;
+}
+.btn-outline-primary {
+  --bs-btn-color: #d96a17;
+  --bs-btn-border-color: var(--rf-orange);
+  --bs-btn-hover-bg: var(--rf-orange);
+  --bs-btn-hover-border-color: var(--rf-orange);
+}
+
+/* Tables */
+.table thead th { background: var(--rf-ink); color: var(--rf-white); }
+.table-accent thead th { background: var(--rf-orange); color: var(--rf-white); }
+
+/* Links & active nav */
+.nav-link.active, .nav-pills .nav-link.active { background: var(--rf-orange); color: var(--rf-white); }
+
+/* Status badges */
+.badge-ok     { background: var(--rf-ok); color:#fff; }
+.badge-warn   { background: var(--rf-warn); color: var(--rf-ink); }
+.badge-danger { background: var(--rf-danger); color:#fff; }
+.badge-fixed  { background: var(--rf-charcoal); color: var(--rf-white); }

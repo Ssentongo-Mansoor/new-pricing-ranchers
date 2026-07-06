@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block heading %}Fulfilment KPIs{% endblock %}
+{% block content %}
+{% include "reports/_nav.html" %}
+<form class="row g-2 align-items-end mb-3" method="get">
+  <div class="col-auto"><label class="form-label small mb-0">Window (days)</label>
+    <input class="form-control form-control-sm" type="number" name="days" value="{{ days }}"></div>
+  <div class="col-auto"><button class="btn btn-sm btn-primary">Run</button></div>
+</form>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="rf-stat"><div class="num">{{ orders }}</div><div class="lbl">Orders fulfilled</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-stat"><div class="num">{{ '%.0f'|format(fill)~'%' if fill is not none else '—' }}</div><div class="lbl">Fill rate (units)</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-stat"><div class="num">{{ '%.0f'|format(ontime_pct)~'%' if ontime_pct is not none else '—' }}</div><div class="lbl">On-time dispatch</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-stat"><div class="num">{{ on_time }}/{{ on_time_base }}</div><div class="lbl">On time / measured</div></div></div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-4"><div class="rf-stat"><div class="num" style="font-size:1.3rem">{{ speed.dispatch }}</div><div class="lbl">Avg placed → dispatch</div></div></div>
+  <div class="col-6 col-lg-4"><div class="rf-stat"><div class="num" style="font-size:1.3rem">{{ speed.deliver }}</div><div class="lbl">Avg dispatch → delivered</div></div></div>
+  <div class="col-6 col-lg-4"><div class="rf-stat"><div class="num" style="font-size:1.3rem">{{ speed.cycle }}</div><div class="lbl">Avg total cycle</div></div></div>
+</div>
+
+<div class="rf-card p-3 mb-3">
+  <h2 class="h6">Slowest orders (longest total cycle)</h2>
+  <div class="table-responsive">
+  <table class="table table-sm mb-0"><thead><tr><th>Order</th><th>Customer</th><th class="text-end">Placed→dispatch</th><th class="text-end">Total cycle</th></tr></thead>
+    <tbody>
+    {% for s in slowest %}<tr><td>{{ s.number }}</td><td>{{ s.customer }}</td><td class="text-end">{{ s.to_dispatch }}</td><td class="text-end fw-semibold">{{ s.to_deliver }}</td></tr>
+    {% else %}<tr><td colspan="4" class="text-muted text-center py-3">No completed orders in this period.</td></tr>{% endfor %}
+    </tbody></table>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-5"><div class="rf-card p-3 h-100">
+    <h2 class="h6">Fill rate by week</h2>
+    <table class="table table-sm mb-0"><thead><tr><th>Week</th><th class="text-end">Fill rate</th></tr></thead>
+      <tbody>
+      {% for w in weekly %}<tr><td class="small">{{ w.week }}</td>
+        <td class="text-end">{{ '%.0f'|format(w.fill)~'%' if w.fill is not none else '—' }}</td></tr>
+      {% else %}<tr><td colspan="2" class="text-muted text-center py-3">No fulfilled orders.</td></tr>{% endfor %}
+      </tbody></table>
+  </div></div>
+  <div class="col-lg-7"><div class="rf-card p-3 h-100">
+    <h2 class="h6">Products most often short</h2>
+    <table class="table table-sm mb-0"><thead><tr><th>Article</th><th>Description</th><th class="text-end">Times short</th></tr></thead>
+      <tbody>
+      {% for s in short %}<tr><td class="fw-semibold">{{ s.article }}</td><td>{{ s.desc }}</td>
+        <td class="text-end"><span class="badge badge-warn">{{ s.count }}</span></td></tr>
+      {% else %}<tr><td colspan="3" class="text-muted text-center py-3">Nothing came up short — full delivery throughout.</td></tr>{% endfor %}
+      </tbody></table>
+  </div></div>
+</div>
+{% endblock %}

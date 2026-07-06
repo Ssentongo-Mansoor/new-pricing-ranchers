@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block heading %}Lapsed &amp; at-risk{% endblock %}
+{% block content %}
+{% include "reports/_nav.html" %}
+
+<form class="row g-2 align-items-end mb-3" method="get">
+  <div class="col-auto"><label class="form-label small mb-0">Window (days)</label>
+    <input class="form-control form-control-sm" type="number" name="days" value="{{ days }}"></div>
+  <div class="col-auto"><button class="btn btn-sm btn-primary">Run</button></div>
+  <div class="col-auto"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('reports.lapsed', **{'days':days,'export':'csv'}) }}"><i class="bi bi-download"></i> Stopped-buying CSV</a></div>
+</form>
+<p class="small text-muted">“Recent” = last {{ days }} days; compared with the {{ days }} days before that.</p>
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="rf-card p-3 h-100">
+      <h2 class="h6"><i class="bi bi-person-dash text-rf-orange"></i> Customers gone quiet</h2>
+      <p class="small text-muted">Ordered before, but nothing in the last {{ days }} days.</p>
+      <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Customer</th><th>Category</th><th>Last order</th><th class="text-end">Days ago</th></tr></thead>
+        <tbody>
+        {% for a in at_risk %}
+          <tr><td><a href="{{ url_for('reports.customer_insights', customer_id=a.customer.id) }}">{{ a.customer.name }}</a></td>
+            <td class="small">{{ a.category }}</td>
+            <td class="small">{{ a.last_order }}</td>
+            <td class="text-end fw-semibold {{ 'text-danger' if a.days>=2*days }}">{{ a.days }}</td></tr>
+        {% else %}<tr><td colspan="4" class="text-muted text-center py-3">No lapsed customers — everyone's ordered recently.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="rf-card p-3 h-100">
+      <h2 class="h6"><i class="bi bi-cart-dash text-rf-orange"></i> Products customers have stopped buying</h2>
+      <p class="small text-muted">Bought in the previous period but not the recent one — a chance to reach out.</p>
+      <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Customer</th><th>Article</th><th>Description</th><th class="text-end">Prev qty</th><th>Last ordered</th></tr></thead>
+        <tbody>
+        {% for s in stopped %}
+          <tr><td><a href="{{ url_for('reports.customer_insights', customer_id=s.customer_id) }}">{{ s.customer }}</a></td>
+            <td>{{ s.article }}</td><td>{{ s.desc }}</td>
+            <td class="text-end">{{ '%g'|format(s.prev_qty) }}</td><td class="small">{{ s.last }}</td></tr>
+        {% else %}<tr><td colspan="5" class="text-muted text-center py-3">Nothing dropped — customers are still buying their usual lines.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

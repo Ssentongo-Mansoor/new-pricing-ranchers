@@ -1,0 +1,48 @@
+{% extends "portal/base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h5 rf-head mb-1">Quote {{ offer.number }}</h1>
+    <div class="small text-muted">{{ offer.currency }} · {{ 'VAT '~(offer.vat_rate|int)~'%' if offer.vat_applicable else 'zero-rated' }}
+      {% if offer.source_pricelist and offer.source_pricelist.price_basis == 'kg' %}· <strong>prices per kg</strong>{% endif %}
+      · valid {{ offer.valid_from }} → {{ offer.valid_until or '—' }}
+      {% if offer.status=='converted' %}· <span class="badge badge-ok">accepted</span>{% endif %}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('portal.offer_pdf', offer_id=offer.id, view=1) }}" target="_blank"><i class="bi bi-eye"></i> View</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('portal.offer_pdf', offer_id=offer.id) }}"><i class="bi bi-download"></i> PDF</a>
+    {% if offer.status=='issued' %}
+    <form method="post" action="{{ url_for('portal.accept_offer', offer_id=offer.id) }}" onsubmit="return confirm('Accept this quote and place it as an order?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-sm btn-primary"><i class="bi bi-check2-circle"></i> Accept &amp; order</button></form>
+    {% endif %}
+  </div>
+</div>
+
+{% if offer.converted_order_id %}
+<div class="alert alert-success py-2"><i class="bi bi-cart-check"></i> You accepted this quote — see order
+  <a href="{{ url_for('portal.order', order_id=offer.converted_order_id) }}">in your orders</a>.</div>
+{% endif %}
+
+<div class="rf-card p-0">
+  <table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Art</th><th>Description</th><th>Pack size</th><th class="text-end">{{ 'Qty (kg)' if (offer.source_pricelist and offer.source_pricelist.price_basis == 'kg') else 'Qty' }}</th><th class="text-end">Unit excl VAT</th><th class="text-end">Unit incl VAT</th><th class="text-end">Total incl VAT</th></tr></thead>
+    <tbody>
+    {% for l in offer.lines %}
+      <tr><td>{{ l.article_no }}</td><td>{{ l.description }}</td><td class="small">{{ l.pack_size }}</td>
+        <td class="text-end">{{ l.quantity }}</td><td class="text-end money">{{ l.unit_price|money(offer.currency) }}</td>
+        {% set vf = (1 + offer.vat_rate/100.0) if (offer.vat_applicable and l.is_vatable) else 1.0 %}
+        <td class="text-end money">{{ (l.unit_price|float * vf)|money(offer.currency) }}</td>
+        <td class="text-end money fw-semibold">{{ (l.line_total|float * vf)|money(offer.currency) }}</td></tr>
+    {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr><td colspan="5"></td><td class="text-end">Subtotal (excl VAT)</td><td class="text-end money">{{ offer.subtotal|money(offer.currency) }}</td></tr>
+      <tr><td colspan="5"></td><td class="text-end">{{ 'VAT '~(offer.vat_rate|int)~'%' if offer.vat_applicable else 'VAT' }}</td><td class="text-end money">{{ offer.vat_amount|money(offer.currency) if offer.vat_applicable else 'Zero-rated' }}</td></tr>
+      <tr class="fw-bold"><td colspan="5"></td><td class="text-end">TOTAL (incl VAT)</td><td class="text-end money text-rf-orange">{{ offer.total|money(offer.currency) }}</td></tr>
+    </tfoot>
+  </table>
+</div>
+{% if offer.notes %}<p class="small text-muted mt-2">{{ offer.notes }}</p>{% endif %}
+<a class="btn btn-link mt-2" href="{{ url_for('portal.home') }}">&larr; Back</a>
+{% endblock %}

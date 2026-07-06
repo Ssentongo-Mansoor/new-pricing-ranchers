@@ -1,0 +1,22 @@
+# cPanel Git Version Control deployment tasks.
+# Runs when you click "Deploy HEAD Commit" in cPanel > Git Version Control.
+# It copies code into the Passenger app directory (keeping instance/ and tmp/),
+# installs requirements, fixes permissions, and gracefully restarts the app.
+#
+# EDIT the two paths below to match your account, then commit this file.
+#   CPUSER   = your cPanel username
+#   APPDIR   = the Passenger application directory (from Setup Python App)
+#   VENVBIN  = the virtualenv bin path shown in Setup Python App
+#              (the "source /home/.../bin/activate" line points to it)
+---
+deployment:
+  tasks:
+    - export APPDIR=/home/CPUSER/ranchers_app
+    - export VENVBIN=/home/CPUSER/virtualenv/ranchers_app/3.11/bin
+    - /usr/bin/rsync -a --delete --exclude='.git' --exclude='instance' --exclude='tmp' --exclude='__pycache__' --exclude='*.pyc' ./ $APPDIR/
+    - $VENVBIN/pip install --upgrade -r $APPDIR/requirements.txt
+    - /bin/find $APPDIR -type d -not -path '*/instance/*' -exec chmod 755 {} \;
+    - /bin/find $APPDIR -type f -not -path '*/instance/*' -exec chmod 644 {} \;
+    - /bin/chmod 755 $APPDIR/passenger_wsgi.py
+    - /bin/mkdir -p $APPDIR/tmp
+    - /bin/touch $APPDIR/tmp/restart.txt

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block heading %}Duplicate pricelist{% endblock %}
+{% block content %}
+<a href="{{ url_for('pricelists.detail', list_id=src.id) }}" class="small">&larr; Back to {{ src.name }}</a>
+<div class="rf-card p-4 mt-2" style="max-width:680px">
+  <p class="text-muted">Make a copy of <strong>{{ src.name }}</strong> as the starting point for a new period. All products, tiers and prices are copied; give it a name and validity dates, then adjust the prices on the new list (they save as you edit).</p>
+  <form method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="mb-3"><label class="form-label">New pricelist name</label>
+      <input class="form-control" name="name" value="{{ suggested }}" required></div>
+    <div class="row">
+      <div class="col-md-6 mb-3"><label class="form-label">Effective date</label>
+        <input class="form-control" type="date" name="effective_date" value="{{ today }}"></div>
+      <div class="col-md-6 mb-3"><label class="form-label">Valid until (optional)</label>
+        <input class="form-control" type="date" name="valid_until"></div>
+    </div>
+    <button class="btn btn-primary">Create copy</button>
+    <a class="btn btn-link" href="{{ url_for('pricelists.detail', list_id=src.id) }}">Cancel</a>
+  </form>
+</div>
+{% endblock %}

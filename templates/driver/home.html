@@ -1,0 +1,70 @@
+{% extends "driver/base.html" %}
+{% macro maptarget(o) %}{% if o.customer and o.customer.latitude is not none and o.customer.longitude is not none %}{{ o.customer.latitude }},{{ o.customer.longitude }}{% else %}{{ (o.delivery_address or (o.customer.address if o.customer else '') or o.customer.name)|urlencode }}{% endif %}{% endmacro %}
+{% block content %}
+
+<!-- progress band -->
+<div class="d-flex gap-2 mb-3 text-center">
+  <div class="rf-card p-2 flex-fill"><div class="fw-bold fs-4" style="color:#ED1C24">{{ to_accept|length }}</div><div class="small text-muted">To accept</div></div>
+  <div class="rf-card p-2 flex-fill"><div class="fw-bold fs-4" style="color:#2E7D32">{{ on_road|length }}</div><div class="small text-muted">On the road</div></div>
+  <div class="rf-card p-2 flex-fill"><div class="fw-bold fs-4">{{ n_delivered_today }}</div><div class="small text-muted">Done today</div></div>
+</div>
+
+{% if to_accept %}
+<h2 class="h6 rf-head"><i class="bi bi-bell-fill text-rf-orange"></i> New — tap to accept</h2>
+{% for o in to_accept %}
+<div class="rf-card p-3 mb-2">
+  <div class="d-flex justify-content-between align-items-start">
+    <div>
+      <div class="fw-semibold">{{ o.customer.name }}</div>
+      <div class="small text-muted">{{ o.dnote_number or o.number }} · {{ o.lines|length }} item(s)</div>
+      {% if o.delivery_address or (o.customer and o.customer.address) %}
+      <div class="small text-muted">{{ (o.delivery_address or o.customer.address)|truncate(60) }}</div>{% endif %}
+    </div>
+    <span class="badge badge-warn">to accept</span>
+  </div>
+  <div class="d-flex gap-2 mt-2">
+    <a class="btn btn-sm btn-outline-secondary flex-fill" target="_blank" href="https://www.google.com/maps/search/?api=1&query={{ maptarget(o)|trim }}"><i class="bi bi-geo-alt"></i> Navigate</a>
+    {% if o.customer and o.customer.phone %}<a class="btn btn-sm btn-outline-secondary flex-fill" href="tel:{{ o.customer.phone }}"><i class="bi bi-telephone"></i> Call</a>{% endif %}
+    <form method="post" action="{{ url_for('driver.accept', order_id=o.id) }}" class="flex-fill">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-sm btn-primary w-100"><i class="bi bi-check2"></i> Accept</button></form>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+<h2 class="h6 rf-head mt-3"><i class="bi bi-truck text-rf-orange"></i> On the road</h2>
+{% for o in on_road %}
+<div class="rf-card p-3 mb-2">
+  <div class="d-flex justify-content-between align-items-start">
+    <div>
+      <div class="fw-semibold">{{ o.customer.name }}</div>
+      <div class="small text-muted">{{ o.dnote_number or o.number }} · {{ o.lines|length }} item(s)</div>
+      {% if o.delivery_address or (o.customer and o.customer.address) %}
+      <div class="small text-muted">{{ (o.delivery_address or o.customer.address)|truncate(60) }}</div>{% endif %}
+    </div>
+    <span class="badge" style="background:#2E7D32">out</span>
+  </div>
+  <div class="d-flex gap-2 mt-2">
+    <a class="btn btn-sm btn-outline-secondary flex-fill" target="_blank" href="https://www.google.com/maps/search/?api=1&query={{ maptarget(o)|trim }}"><i class="bi bi-geo-alt"></i> Navigate</a>
+    {% if o.customer and o.customer.phone %}<a class="btn btn-sm btn-outline-secondary flex-fill" href="tel:{{ o.customer.phone }}"><i class="bi bi-telephone"></i> Call</a>{% endif %}
+    <a class="btn btn-sm btn-success flex-fill" href="{{ url_for('driver.order', order_id=o.id) }}"><i class="bi bi-camera"></i> Delivered</a>
+  </div>
+</div>
+{% else %}
+{% if not to_accept %}<p class="text-muted">No deliveries assigned right now.</p>{% else %}<p class="text-muted small">Nothing on the road yet.</p>{% endif %}
+{% endfor %}
+
+{% if delivered %}
+<h2 class="h6 rf-head mt-4">Recently delivered</h2>
+{% for o in delivered %}
+<a href="{{ url_for('driver.order', order_id=o.id) }}" class="d-flex justify-content-between border-bottom py-2 text-decoration-none text-dark">
+  <span>{{ o.customer.name }} <span class="text-muted small">{{ o.dnote_number or o.number }}</span></span>
+  <span class="badge badge-ok">delivered</span>
+</a>
+{% endfor %}
+{% endif %}
+<script>
+setTimeout(function(){ location.reload(); }, 60000);
+</script>
+{% endblock %}

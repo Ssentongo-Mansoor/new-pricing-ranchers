@@ -1,0 +1,47 @@
+{% extends "costing/_shell.html" %}
+{% block heading %}{{ 'Edit' if config else 'New' }} Packaging Config{% endblock %}
+{% block costing_content %}
+<div class="page-head"><h1>{{ 'Edit' if config else 'New' }} Packaging Config</h1></div>
+<form method="post" class="card" style="max-width:680px">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><div class="card-body">
+  <div class="row">
+    <div class="col-md-7 mb-3"><label class="form-label">Config name</label><input name="name" class="form-control" required value="{{ config.name if config else '' }}"></div>
+    <div class="col-md-5 mb-3"><label class="form-label">Note</label><input name="note" class="form-control" value="{{ config.note or '' if config else '' }}"></div>
+  </div>
+  <table class="table table-sm">
+    <thead><tr><th>Material</th><th class="num" style="width:30%">Unit price /kg</th><th></th></tr></thead>
+    <tbody id="itemBody"></tbody>
+  </table>
+  <button type="button" class="btn btn-sm btn-outline-secondary" id="addItem"><i class="bi bi-plus"></i> Add material</button>
+  <div class="alert alert-secondary py-2 mt-3">Total: <strong id="total" class="text-rf">0</strong> UGX/kg</div>
+  <button class="btn btn-rf">Save</button>
+  <a class="btn btn-link" href="{{ url_for('packaging.index') }}">Cancel</a>
+</div></form>
+<template id="itemTpl">
+  <tr>
+    <td><input name="material" class="form-control form-control-sm" required></td>
+    <td><input name="unit_price" type="number" step="0.01" class="form-control form-control-sm num price" value="0"></td>
+    <td><button type="button" class="btn btn-sm btn-outline-danger py-0 del"><i class="bi bi-x"></i></button></td>
+  </tr>
+</template>
+{% endblock %}
+{% block scripts %}
+<script>
+const body = document.getElementById('itemBody');
+const tpl = document.getElementById('itemTpl');
+function total() {
+  let s = 0; document.querySelectorAll('.price').forEach(e => s += parseFloat(e.value||0));
+  document.getElementById('total').textContent = Math.round(s).toLocaleString('en-US');
+}
+function addItem(m, p) {
+  const tr = tpl.content.cloneNode(true).querySelector('tr');
+  if (m !== undefined) { tr.querySelector('[name=material]').value = m; tr.querySelector('[name=unit_price]').value = p; }
+  tr.querySelector('.del').addEventListener('click', () => { tr.remove(); total(); });
+  tr.querySelector('.price').addEventListener('input', total);
+  body.appendChild(tr);
+}
+document.getElementById('addItem').addEventListener('click', () => addItem());
+{% if config %}{% for it in config.items %}addItem({{ it.material|tojson }}, {{ it.unit_price }});{% endfor %}{% else %}addItem(); addItem();{% endif %}
+total();
+</script>
+{% endblock %}

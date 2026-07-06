@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block heading %}All-time report{% endblock %}
+{% macro ugx(v) %}UGX {{ '{:,.0f}'.format(v or 0) }}{% endmacro %}
+{% block content %}
+{% include "reports/_nav.html" %}
+
+{% if not has_data %}
+<div class="rf-card p-4"><p class="text-muted mb-0">No historical sales loaded yet.</p></div>
+{% else %}
+<p class="small text-muted">Overall performance across all loaded history (net untaxed UGX).</p>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="rf-card p-3 text-center h-100">
+    <div class="text-muted small text-uppercase">Total revenue</div>
+    <div class="h4 mb-0" style="color:#F47A21">{{ ugx(total) }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-card p-3 text-center h-100">
+    <div class="text-muted small text-uppercase">Avg / month</div>
+    <div class="h4 mb-0">{{ ugx(avg_month) }}</div>
+    <div class="small text-muted">{{ n_months }} months</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-card p-3 text-center h-100">
+    <div class="text-muted small text-uppercase">Best month</div>
+    <div class="h6 mb-0" style="color:#2E7D32">{{ best_month[0] if best_month }}</div>
+    <div class="small text-muted">{{ ugx(best_month[1]) if best_month }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-card p-3 text-center h-100">
+    <div class="text-muted small text-uppercase">Invoices · credits</div>
+    <div class="h5 mb-0">{{ '{:,}'.format(n_invoices) }} · {{ '{:,}'.format(n_credit) }}</div>
+    <div class="small text-danger">{{ ugx(cn_total) }} credits</div></div></div>
+</div>
+
+<div class="rf-card p-3 mb-3">
+  <h2 class="h6"><i class="bi bi-graph-up-arrow text-rf-orange"></i> Revenue by month (all time)</h2>
+  <canvas id="atMonth" height="80"></canvas>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-4"><div class="rf-card p-3 h-100">
+    <h2 class="h6"><i class="bi bi-star text-rf-orange"></i> Best customers</h2>
+    <table class="table table-sm align-middle mb-0"><tbody>
+    {% for name, val in top_customers %}
+      <tr><td class="small fw-semibold">{{ loop.index }}. {{ name }}</td><td class="text-end money">{{ ugx(val) }}</td></tr>
+    {% endfor %}
+    </tbody></table></div></div>
+  <div class="col-lg-4"><div class="rf-card p-3 h-100">
+    <h2 class="h6"><i class="bi bi-box-seam text-rf-orange"></i> Best products</h2>
+    <table class="table table-sm align-middle mb-0"><tbody>
+    {% for name, val in top_products %}
+      <tr><td class="small fw-semibold">{{ loop.index }}. {{ name }}</td><td class="text-end money">{{ ugx(val) }}</td></tr>
+    {% endfor %}
+    </tbody></table></div></div>
+  <div class="col-lg-4"><div class="rf-card p-3 h-100">
+    <h2 class="h6"><i class="bi bi-people-fill text-rf-orange"></i> Best salespeople</h2>
+    <table class="table table-sm align-middle mb-0"><tbody>
+    {% for name, val in top_sales %}
+      <tr><td class="small fw-semibold">{{ loop.index }}. {{ name }}</td><td class="text-end money">{{ ugx(val) }}</td></tr>
+    {% else %}<tr><td class="text-muted small">No salesperson data.</td></tr>{% endfor %}
+    </tbody></table>
+    <h3 class="h6 mt-3">By year</h3>
+    <table class="table table-sm align-middle mb-0"><tbody>
+    {% for y in years %}<tr><td>{{ y }}</td><td class="text-end money">{{ ugx(year_tot[y]) }}</td></tr>{% endfor %}
+    </tbody></table>
+  </div></div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if has_data %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script>
+const ugxTick = v => 'UGX ' + Number(v).toLocaleString();
+(function(){
+  const ctx=document.getElementById('atMonth'); if(!ctx) return;
+  new Chart(ctx,{type:'line',data:{labels:{{ month_labels|tojson }},
+    datasets:[{data:{{ month_values|tojson }},borderColor:'#F47A21',
+      backgroundColor:'rgba(244,122,33,0.12)',fill:true,tension:0.3,pointRadius:0,borderWidth:2}]},
+    options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>ugxTick(c.parsed.y)}}},
+      scales:{x:{ticks:{maxTicksLimit:12,autoSkip:true}},y:{ticks:{callback:ugxTick}}}}});
+})();
+</script>
+{% endif %}
+{% endblock %}

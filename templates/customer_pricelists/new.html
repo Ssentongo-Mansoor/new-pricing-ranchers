@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block heading %}New customer pricelist{% endblock %}
+{% block content %}
+<div class="rf-card p-4" style="max-width:680px">
+  <p class="text-muted">Pick a customer and a generic base list. Next you finalise every price on one screen, then save once.</p>
+  <form method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="build">
+    <div class="mb-3"><label class="form-label">Customer</label>
+      <select class="form-select" name="customer_id" required>
+        <option value="">Choose…</option>
+        {% for c in customers %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+      </select></div>
+    <div class="mb-3"><label class="form-label">Base generic list</label>
+      <select class="form-select" name="base_id" required>
+        <option value="">Choose…</option>
+        {% for b in bases %}<option value="{{ b.id }}">{{ b.name }} ({{ b.currency }})</option>{% endfor %}
+      </select></div>
+    <div class="mb-3"><label class="form-label">Name (optional)</label>
+      <input class="form-control" name="name" placeholder="Defaults to “Customer — Base list”"></div>
+    <div class="mb-3"><label class="form-label">Valid until (optional)</label>
+      <input class="form-control" type="date" name="valid_until"></div>
+    <div class="mb-3"><label class="form-label">Notes</label>
+      <textarea class="form-control" name="notes" rows="2"></textarea></div>
+    <button class="btn btn-primary">Continue to prices →</button>
+    <a class="btn btn-link" href="{{ url_for('customer_pricelists.index') }}">Cancel</a>
+  </form>
+</div>
+{% endblock %}

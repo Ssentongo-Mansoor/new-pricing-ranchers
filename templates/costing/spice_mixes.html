@@ -1,0 +1,28 @@
+{% extends "costing/_shell.html" %}
+{% block heading %}Spice Mixes{% endblock %}
+{% block costing_content %}
+<div class="page-head">
+  <h1>Spice Mixes &amp; Sub-recipes</h1>
+  <div class="spacer"></div>
+  {% if has_perm(current_user, 'edit_costing') %}<a class="btn btn-sm btn-rf" href="{{ url_for('spice_mixes.new') }}"><i class="bi bi-plus-lg"></i> New Spice Mix</a>{% endif %}
+</div>
+<div class="card"><div class="card-body">
+  <table class="table table-hover align-middle">
+    <thead><tr><th>Name</th><th class="num">Lines</th><th class="num">Cost/kg</th><th></th></tr></thead>
+    <tbody>
+      {% for mix, cpk in rows %}
+      <tr>
+        <td class="fw-semibold"><a href="{{ url_for('spice_mixes.view', mid=mix.id) }}" class="text-decoration-none">{{ mix.name }}</a></td>
+        <td class="num">{{ mix.lines|length }}</td>
+        <td class="num text-rf fw-semibold">{{ cpk|money }}</td>
+        <td>
+          <a class="btn btn-sm btn-outline-secondary py-0" href="{{ url_for('spice_mixes.view', mid=mix.id) }}"><i class="bi bi-eye"></i></a>
+          {% if has_perm(current_user, 'edit_costing') %}<a class="btn btn-sm btn-outline-secondary py-0" href="{{ url_for('spice_mixes.edit', mid=mix.id) }}"><i class="bi bi-pencil"></i></a>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="text-muted small">{{ rows|length }} spice mix(es)</div>
+</div></div>
+{% endblock %}

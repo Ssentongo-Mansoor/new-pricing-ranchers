@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Artisanal look — preview{% endblock %}
+{% block heading %}Theme preview{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <span class="badge" style="background:var(--rf-olive)">Preview only — live theme is currently: {{ current_theme|capitalize }}</span>
+  <form method="post" action="{{ url_for('admin.settings') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="app_name" value="{{ app_name }}">
+    <input type="hidden" name="company_name" value="{{ company_name }}">
+    <input type="hidden" name="theme" value="artisanal">
+    <button class="rf-cta border-0">Use this look</button>
+  </form>
+</div>
+
+<div class="rf-hero mb-4">
+  <div class="rf-editorial-intro" style="color:#fff">
+    <div class="kicker" style="color:#f4d7b8">Ranchers Finest · Est. Uganda</div>
+    <h1 style="color:#fff">Craft butchery,<br>raised the honest way.</h1>
+    <p style="color:#f4d7b8">Pasture to plate. Grass-fed herds, dry-aged with patience, cut by hand. Quality you can taste, at a price that brings people to the table.</p>
+  </div>
+</div>
+
+<div class="rf-editorial-intro mb-3">
+  <div class="kicker">The Counter</div>
+  <h1>This week's cuts</h1>
+  <p>Each cut carries its story first: where it was raised, how it was aged, why it tastes the way it does. Price comes last.</p>
+</div>
+
+<div class="rf-menu mb-4">
+
+  <article class="rf-prod">
+    <div class="ph" style="background:linear-gradient(150deg,#7a2418,#b5341f 55%,#e2701a)"><span class="tag">Dry-aged · 35 days</span></div>
+    <div class="body">
+      <div class="eyebrow">Ankole Beef · Ribeye</div>
+      <h3>35-Day Dry-Aged Ribeye</h3>
+      <div class="prov">From the Ankole long-horn herds of Kiruhura.</div>
+      <p class="story">Aged on the bone in our Himalayan-salt room for five weeks, building a deep, nutty richness. Hand-trimmed to a generous on-the-bone steak.</p>
+      <div class="meta"><span class="chip">Grass-fed</span><span class="chip">On the bone</span><span class="chip">Hand-cut</span></div>
+      <div class="foot">
+        <div class="price"><span class="amt">UGX 78,000</span><span class="unit">per kg</span></div>
+        <button class="rf-cta border-0">Add to order</button>
+      </div>
+    </div>
+  </article>
+
+  <article class="rf-prod">
+    <div class="ph" style="background:linear-gradient(150deg,#5b3a1c,#8a5a2a 55%,#e9a23b)"><span class="tag olive">Pasture-raised</span></div>
+    <div class="body">
+      <div class="eyebrow">Highland Lamb · Rump</div>
+      <h3>Grass-Fed Lamb Rump</h3>
+      <div class="prov">Reared on the cool highlands of Kabale.</div>
+      <p class="story">Slow-grown on wild mountain pasture for a clean, delicate flavour. Seam-butchered for an even, tender roast or quick high-heat sear.</p>
+      <div class="meta"><span class="chip">Free-roaming</span><span class="chip">Seam-cut</span></div>
+      <div class="foot">
+        <div class="price"><span class="amt">UGX 64,000</span><span class="unit">per kg</span></div>
+        <button class="rf-cta border-0">Add to order</button>
+      </div>
+    </div>
+  </article>
+
+  <article class="rf-prod">
+    <div class="ph" style="background:linear-gradient(150deg,#6b2f16,#a8542a 55%,#e9a23b)"><span class="tag">Slow-cured · 7 days</span></div>
+    <div class="body">
+      <div class="eyebrow">Heritage Pork · Belly</div>
+      <h3>Slow-Cured Pork Belly</h3>
+      <div class="prov">Heritage-breed pigs from Masaka smallholders.</div>
+      <p class="story">Dry-cured by hand with raw cane sugar and cracked pepper, then rested a week so the fat renders silken. Built for crackling.</p>
+      <div class="meta"><span class="chip">Heritage breed</span><span class="chip">Nitrate-free</span></div>
+      <div class="foot">
+        <div class="price"><span class="amt">UGX 42,000</span><span class="unit">per kg</span></div>
+        <button class="rf-cta border-0">Add to order</button>
+      </div>
+    </div>
+  </article>
+
+  <article class="rf-prod">
+    <div class="ph" style="background:linear-gradient(150deg,#3a1f12,#7a2418 55%,#c75f12)"><span class="tag">Coffee-rubbed</span></div>
+    <div class="body">
+      <div class="eyebrow">Beef · Short Rib</div>
+      <h3>Smoked Beef Short Rib</h3>
+      <div class="prov">Finished over Mount Elgon coffee wood.</div>
+      <p class="story">Rubbed with Sipi Falls coffee and muscovado, smoked low for hours until the meat surrenders off the bone. A centrepiece cut.</p>
+      <div class="meta"><span class="chip">Wood-smoked</span><span class="chip">Bone-in</span></div>
+      <div class="foot">
+        <div class="price"><span class="amt">UGX 55,000</span><span class="unit">per kg</span></div>
+        <button class="rf-cta border-0">Add to order</button>
+      </div>
+    </div>
+  </article>
+
+  <article class="rf-prod">
+    <div class="ph" style="background:linear-gradient(150deg,#7a5a1c,#b58a2a 55%,#e9c23b)"><span class="tag olive">Free-range</span></div>
+    <div class="body">
+      <div class="eyebrow">Poultry · Whole Bird</div>
+      <h3>Herb-Brined Free-Range Chicken</h3>
+      <div class="prov">Day-ranged flocks from Mpigi farms.</div>
+      <p class="story">Birds raised slowly with room to roam, brined overnight in rosemary, thyme and garlic so they roast up juicy with golden skin.</p>
+      <div class="meta"><span class="chip">Free-range</span><span class="chip">Air-chilled</span></div>
+      <div class="foot">
+        <div class="price"><span class="amt">UGX 28,000</span><span class="unit">each</span></div>
+        <button class="rf-cta border-0">Add to order</button>
+      </div>
+    </div>
+  </article>
+
+  <article class="rf-prod">
+    <div class="ph" style="background:linear-gradient(150deg,#5b1f14,#9a3520 55%,#e2701a)"><span class="tag">Chef's pick</span></div>
+    <div class="body">
+      <div class="eyebrow">Wagyu-Cross · Picanha</div>
+      <h3>Picanha, Fat-Cap On</h3>
+      <div class="prov">Wagyu-cross steers, grain-finished 120 days.</div>
+      <p class="story">The Brazilian cut prized by grill masters. Left with its full fat cap for basting flavour as it cooks. Slice thick, sear hard.</p>
+      <div class="meta"><span class="chip">Marbled</span><span class="chip">Fat-cap on</span></div>
+      <div class="foot">
+        <div class="price"><span class="amt">UGX 88,000</span><span class="unit">per kg</span></div>
+        <button class="rf-cta border-0">Add to order</button>
+      </div>
+    </div>
+  </article>
+
+</div>
+
+<hr class="rf-rule">
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3 col-6"><div class="rf-kpi"><div class="num">35</div><div class="lbl">Days aged</div></div></div>
+  <div class="col-md-3 col-6"><div class="rf-kpi"><div class="num">14</div><div class="lbl">Partner farms</div></div></div>
+  <div class="col-md-3 col-6"><div class="rf-kpi"><div class="num">100%</div><div class="lbl">Grass-fed beef</div></div></div>
+  <div class="col-md-3 col-6"><div class="rf-kpi"><div class="num">1d</div><div class="lbl">Farm to counter</div></div></div>
+</div>
+
+<div class="rf-card p-4">
+  <div class="rf-eyebrow">Sample data table</div>
+  <h2 class="h4 mb-3">How prices read in this look</h2>
+  <table class="table">
+    <thead><tr><th>Cut</th><th>Provenance</th><th class="text-end">Price / kg</th></tr></thead>
+    <tbody>
+      <tr><td>Dry-Aged Ribeye</td><td>Kiruhura · Ankole</td><td class="text-end money">UGX 78,000</td></tr>
+      <tr><td>Lamb Rump</td><td>Kabale highlands</td><td class="text-end money">UGX 64,000</td></tr>
+      <tr><td>Picanha</td><td>Wagyu-cross</td><td class="text-end money">UGX 88,000</td></tr>
+    </tbody>
+  </table>
+  <div class="d-flex gap-2 mt-2">
+    <button class="btn btn-primary">Primary button</button>
+    <button class="btn btn-outline-primary">Secondary</button>
+    <button class="rf-cta border-0">Pill call-to-action</button>
+  </div>
+</div>
+
+<div class="text-center my-4">
+  <form method="post" action="{{ url_for('admin.settings') }}" class="d-inline">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="app_name" value="{{ app_name }}">
+    <input type="hidden" name="company_name" value="{{ company_name }}">
+    <input type="hidden" name="theme" value="artisanal">
+    <button class="rf-cta border-0">Switch the app to this look</button>
+  </form>
+  <a class="btn btn-link" href="{{ url_for('admin.settings') }}">Back to settings</a>
+</div>
+{% endblock %}

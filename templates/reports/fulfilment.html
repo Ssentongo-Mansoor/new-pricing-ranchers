@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% from "reports/_macros.html" import daterange %}
+{% block heading %}Fulfilment report{% endblock %}
+{% block content %}
+{% include "reports/_nav.html" %}
+{{ daterange('reports.fulfilment') }}
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h2 class="h6 mb-0">{{ frm }} → {{ to }}</h2>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('reports.fulfilment', **{'from':frm,'to':to,'export':'csv'}) }}"><i class="bi bi-download"></i> Missed items CSV</a>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="rf-stat"><div class="num">{{ summary.orders }}</div><div class="lbl">Orders fulfilled</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-stat"><div class="num">{{ '%.0f'|format(summary.fill) if summary.fill is not none else '—' }}{% if summary.fill is not none %}%{% endif %}</div><div class="lbl">Fill rate (units)</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-stat"><div class="num">{{ summary.lines_short }}</div><div class="lbl">Lines missed/short</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-stat"><div class="num">{{ '%g'|format(summary.units_delivered) }}/{{ '%g'|format(summary.units_ordered) }}</div><div class="lbl">Units delivered/ordered</div></div></div>
+</div>
+
+<div class="rf-card p-3 mb-3">
+  <h3 class="h6">Value</h3>
+  <table class="table table-sm mb-0" style="max-width:520px">
+    <thead><tr><th>Currency</th><th class="text-end">Ordered</th><th class="text-end">Delivered</th><th class="text-end">Missed</th></tr></thead>
+    <tbody>
+    {% for cur in summary.val_ordered.keys() %}
+      <tr><td>{{ cur }}</td>
+        <td class="text-end money">{{ summary.val_ordered[cur]|money(cur) }}</td>
+        <td class="text-end money">{{ summary.val_delivered[cur]|money(cur) }}</td>
+        <td class="text-end money text-danger">{{ summary.val_missed.get(cur,0)|money(cur) }}</td></tr>
+    {% else %}<tr><td colspan="4" class="text-muted">No fulfilled orders in this period.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h3 class="h6">Items missed</h3>
+<div class="table-responsive rf-card mb-3">
+<table class="table table-sm align-middle mb-0">
+  <thead><tr><th>Order</th><th>Customer</th><th>Article</th><th>Description</th><th class="text-end">Ordered</th><th class="text-end">Delivered</th><th class="text-end">Short</th><th>Status</th><th class="text-end">Value short</th></tr></thead>
+  <tbody>
+  {% for m in missed %}
+    <tr><td>{{ m.order }}</td><td>{{ m.customer }}</td><td>{{ m.article }}</td><td>{{ m.description }}</td>
+      <td class="text-end">{{ '%g'|format(m.ordered) }}</td><td class="text-end">{{ '%g'|format(m.delivered) }}</td>
+      <td class="text-end fw-semibold">{{ '%g'|format(m.short) }}</td>
+      <td>{% if m.status=='not_delivered' %}<span class="badge badge-danger">not delivered</span>{% else %}<span class="badge badge-warn">short</span>{% endif %}</td>
+      <td class="text-end money text-danger">{{ m.value_short|money(m.currency) }}</td></tr>
+  {% else %}<tr><td colspan="9" class="text-center text-muted py-3">Nothing missed — everything fulfilled in full.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+
+<h3 class="h6">Orders fulfilled</h3>
+<div class="table-responsive rf-card">
+<table class="table table-sm align-middle mb-0">
+  <thead><tr><th>Order</th><th>Customer</th><th>Date</th><th class="text-end">Units ord.</th><th class="text-end">Units del.</th><th class="text-end">Missed lines</th><th class="text-end">Total</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr><td class="fw-semibold">{{ r.order }}</td>
+      <td>{{ r.customer }}</td><td class="small">{{ r.date }}</td>
+      <td class="text-end">{{ '%g'|format(r.ordered) }}</td><td class="text-end">{{ '%g'|format(r.delivered) }}</td>
+      <td class="text-end">{{ r.missed_lines }}</td><td class="text-end money">{{ r.total|money(r.currency) }}</td></tr>
+  {% else %}<tr><td colspan="7" class="text-center text-muted py-3">No fulfilled orders in this period.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

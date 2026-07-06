@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block heading %}Pricelists{% endblock %}
+{% block content %}
+{% include "partials/pricelist_tabs.html" %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <p class="text-muted mb-0">
+    {% if show_archived %}Archived pricelists — hidden from the main list, kept as records.
+    {% else %}Pricelists grouped by type. Open one to consult, or use the buttons to download, copy or archive it.{% endif %}
+  </p>
+  <div class="d-flex gap-2">
+    {% if show_archived %}
+      <a class="btn btn-outline-secondary" href="{{ url_for('pricelists.index') }}"><i class="bi bi-arrow-left"></i> Active</a>
+    {% else %}
+      <a class="btn btn-outline-secondary" href="{{ url_for('pricelists.index', archived=1) }}"><i class="bi bi-archive"></i> Archived{% if n_archived %} ({{ n_archived }}){% endif %}</a>
+    {% endif %}
+  </div>
+</div>
+
+{% macro actions(p) %}
+  <div class="d-flex flex-wrap gap-1 justify-content-end">
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('pricelists.export_generic', list_id=p.id, fmt='xlsx') }}"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('pricelists.export_generic', list_id=p.id, fmt='pdf') }}"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
+    {% if current_user.can_manage_all and not p.archived %}
+    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('pricelists.duplicate', list_id=p.id) }}"><i class="bi bi-files"></i> Copy</a>
+    {% endif %}
+    {% if current_user.can_manage_all %}
+      {% if p.archived %}
+      <form method="post" action="{{ url_for('pricelists.unarchive', list_id=p.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-counterclockwise"></i> Restore</button></form>
+      {% else %}
+      <form method="post" action="{{ url_for('pricelists.archive', list_id=p.id) }}"
+            onsubmit="return confirm('Archive “{{ p.name }}”? It will be hidden here but kept and can be restored.')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-archive"></i> Archive</button></form>
+      {% endif %}
+    {% endif %}
+    {% if current_user.is_admin %}
+    <form method="post" action="{{ url_for('pricelists.delete', list_id=p.id) }}"
+          onsubmit="return confirm('Permanently DELETE “{{ p.name }}” and all its prices? This cannot be undone.')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-sm btn-outline-danger" title="Delete permanently"><i class="bi bi-trash"></i></button></form>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% for group, lists in grouped %}
+<div class="mb-4">
+  <h2 class="h5 rf-head mb-2"><i class="bi bi-folder2-open text-rf-orange"></i> {{ group }}
+    <span class="badge bg-secondary">{{ lists|length }}</span></h2>
+  <div class="table-responsive rf-card">
+  <table class="table table-hover align-middle mb-0">
+    <thead><tr><th>Name</th><th>Currency</th><th>VAT</th><th>Effective</th><th>Validity</th><th class="text-end">Actions</th></tr></thead>
+    <tbody>
+    {% for p in lists %}
+      <tr>
+        <td>
+          <a href="{{ url_for('pricelists.detail', list_id=p.id) }}" class="fw-semibold">{{ p.name }}</a>
+          <div class="small text-muted text-capitalize">{{ p.channel }} · {{ p.market }}</div>
+        </td>
+        <td>{{ p.currency }}</td>
+        <td>{{ 'Zero-rated' if p.is_zero_rated else (p.vat_rate|int)~'%' }}</td>
+        <td class="small">{{ p.effective_date }}</td>
+        <td>
+          {% set st = p.status_for() %}
+          {% if st=='expired' %}<span class="badge badge-danger">expired</span>
+          {% elif st=='expiring' %}<span class="badge badge-warn">expiring {{ p.valid_until }}</span>
+          {% elif st=='valid' %}<span class="badge badge-ok">valid to {{ p.valid_until }}</span>
+          {% else %}<span class="badge bg-secondary">open</span>{% endif %}
+        </td>
+        <td style="min-width:260px">{{ actions(p) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% else %}
+<div class="rf-card p-4 text-center text-muted">
+  {% if show_archived %}No archived pricelists.{% else %}No pricelists yet. Run <code>importer.py</code> or upload one in Admin.{% endif %}
+</div>
+{% endfor %}
+
+{% if not current_user.can_manage_all %}
+<div class="alert alert-info small mt-2"><i class="bi bi-info-circle"></i>
+  You are signed in as a <strong>{{ current_user.role }}</strong>. The Copy, Archive and Delete buttons are only shown to managers and admins.</div>
+{% endif %}
+{% endblock %}

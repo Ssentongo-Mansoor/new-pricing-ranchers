@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block heading %}Call lists{% endblock %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="rf-card p-0">
+      <div class="p-3 border-bottom fw-semibold">Active call lists</div>
+      <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+        <thead><tr><th>List</th><th>Assigned to</th><th>Due</th><th class="text-end">Progress</th><th></th></tr></thead>
+        <tbody>
+        {% for cl in lists %}
+          <tr>
+            <td><a href="{{ url_for('crm.call_list', list_id=cl.id) }}" class="fw-semibold">{{ cl.name }}</a></td>
+            <td class="small">{{ cl.assigned_to.full_name if cl.assigned_to else '—' }}</td>
+            <td class="small">{{ cl.due_date.strftime('%d %b') if cl.due_date else '—' }}</td>
+            <td class="text-end">{{ cl.done_count }}/{{ cl.total_count }}</td>
+            <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('crm.call_list', list_id=cl.id) }}">Work it</a></td>
+          </tr>
+        {% else %}<tr><td colspan="5" class="text-center text-muted py-3">No call lists yet.</td></tr>{% endfor %}
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="rf-card p-3">
+      <h2 class="h6">New call list</h2>
+      <form method="post" action="{{ url_for('crm.call_list_new') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-2"><label class="form-label small">Name</label>
+          <input class="form-control form-control-sm" name="name" placeholder="e.g. Monday supermarket calls" required></div>
+        <div class="row g-2">
+          <div class="col-7"><label class="form-label small">Assign to</label>
+            <select class="form-select form-select-sm" name="assigned_to">
+              <option value="">—</option>
+              {% for u in telesales %}<option value="{{ u.id }}">{{ u.full_name }} ({{ u.role }})</option>{% endfor %}
+            </select></div>
+          <div class="col-5"><label class="form-label small">Due date</label>
+            <input class="form-control form-control-sm" type="date" name="due_date"></div>
+        </div>
+        <div class="mt-2"><label class="form-label small">Fill with</label>
+          <select class="form-select form-select-sm" name="populate" id="popMode" onchange="popToggle()">
+            <option value="">Empty (add customers later)</option>
+            <option value="quiet">Customers not contacted in N days</option>
+            <option value="category">All customers in a category</option>
+          </select></div>
+        <div class="mt-2" id="quietBox" style="display:none">
+          <label class="form-label small">Days quiet</label>
+          <input class="form-control form-control-sm" type="number" name="quiet_days" value="30" style="max-width:120px">
+        </div>
+        <div class="mt-2" id="catBox" style="display:none">
+          <label class="form-label small">Category id</label>
+          <input class="form-control form-control-sm" type="number" name="category_id" placeholder="see Admin → Customer categories" style="max-width:160px">
+        </div>
+        <button class="btn btn-sm btn-primary mt-3">Create list</button>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+function popToggle(){
+  var m=document.getElementById('popMode').value;
+  document.getElementById('quietBox').style.display = m==='quiet' ? '' : 'none';
+  document.getElementById('catBox').style.display = m==='category' ? '' : 'none';
+}
+</script>
+{% endblock %}

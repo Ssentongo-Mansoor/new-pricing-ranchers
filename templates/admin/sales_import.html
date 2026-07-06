@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block heading %}Admin{% endblock %}
+{% block content %}
+{% include "admin/_nav.html" %}
+<div class="rf-card p-4" style="max-width:680px">
+  <h2 class="h6 mb-1">Import daily sales</h2>
+  <p class="text-muted small mb-3">
+    Upload the Odoo Excel export and the figures flow straight into all sales reports and
+    dashboards. Safe to run every day — rows are matched by invoice number, so new days are
+    added, changed ones (for example a payment now settled) are updated, and re-uploading the
+    same file changes nothing. Do this until the finance app is connected directly.
+  </p>
+
+  <div class="alert alert-light border small mb-3">
+    <div><strong>{{ '{:,}'.format(total) }}</strong> invoices loaded.
+      {% if last %}Latest invoice date: <strong>{{ last.strftime('%d %b %Y') }}</strong>.{% endif %}</div>
+    <div class="mt-1"><strong>{{ '{:,}'.format(prod_rows) }}</strong> product rows loaded.
+      {% if prod_label %}Latest product month: <strong>{{ prod_label }}</strong>.{% endif %}</div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">File type</label>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="layout" id="lay-inv" value="invoices" checked>
+        <label class="form-check-label" for="lay-inv">
+          Sales invoices <span class="text-muted">— "Invoice List Customer-Wise" export</span></label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="layout" id="lay-cn" value="credit_notes">
+        <label class="form-check-label" for="lay-cn">
+          Credit notes <span class="text-muted">— "Credit Notes Customer List" export</span></label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="layout" id="lay-pp" value="product_pivot">
+        <label class="form-check-label" for="lay-pp">
+          Product detail <span class="text-muted">— "Month-over-Month Pivot Invoices Analysis" export</span></label>
+      </div>
+    </div>
+    <div class="mb-3">
+      <input class="form-control" type="file" name="file" accept=".xlsx,.xlsm" required>
+    </div>
+    <button class="btn btn-primary">Upload &amp; import</button>
+  </form>
+
+  <hr class="my-3">
+  <p class="text-muted small mb-0">
+    Invoices and credit notes carry totals (revenue, customer, salesperson, payment status) and
+    feed every revenue report. The product file carries quantities per product per month and
+    feeds the product reports (products-by-month, velocity, customer product mix). For the
+    product file, the month-to-date pivot is authoritative for the months it contains, so a daily
+    upload refreshes the current month. Keep the columns in the order Odoo produces.
+  </p>
+</div>
+{% endblock %}

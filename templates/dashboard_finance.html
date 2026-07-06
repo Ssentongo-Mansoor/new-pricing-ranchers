@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block heading %}Finance dashboard{% endblock %}
+{% block content %}
+
+<p class="small mb-2">
+{% if tb_ok %}<span class="badge badge-ok">Ledger balanced — {{ '{:,}'.format(tb_total) }} both sides ✓</span>
+{% else %}<span class="badge badge-danger">LEDGER OUT OF BALANCE — investigate before anything else</span>{% endif %}
+{% if not inv_tied %}<span class="badge badge-danger ms-1">Inventory subledger differs from GL</span>{% endif %}
+</p>
+
+{# ---- The money position: what matters to finance, first. ---- #}
+<div class="rf-kpis" style="grid-template-columns:repeat(4,1fr)">
+  {% for key, pair in money.items() %}
+  <div class="rf-kpi"><div class="num">{{ '{:,}'.format(pair[1]) }}</div>
+    <div class="lbl">{{ pair[0].name }}</div></div>
+  {% endfor %}
+</div>
+
+<div class="rf-kpis" style="grid-template-columns:repeat(4,1fr)">
+  <a href="{{ url_for('accounting.report_ar') }}"><div class="rf-kpi">
+    <div class="num">{{ '{:,}'.format(ar.total) }}</div>
+    <div class="lbl">Receivables outstanding
+      {% if ar.bucket_totals['90+'] %}<br><span class="text-danger fw-semibold">{{ '{:,}'.format(ar.bucket_totals['90+']) }} over 90 days</span>{% endif %}
+    </div></div></a>
+  <a href="{{ url_for('accounting.report_ap') }}"><div class="rf-kpi">
+    <div class="num">{{ '{:,}'.format(ap.total) }}</div>
+    <div class="lbl">Payables outstanding</div></div></a>
+  <a href="{{ url_for('accounting.report_pl') }}"><div class="rf-kpi">
+    <div class="num">{{ '{:,}'.format(pl.gross_profit) }}</div>
+    <div class="lbl">Gross profit this month
+      {% if pl.margin_pct is not none %}<span class="badge {{ 'badge-ok' if pl.margin_pct >= 25 else 'badge-warn' }}">{{ '%.1f'|format(pl.margin_pct) }}%</span>{% endif %}
+    </div></div></a>
+  <a href="{{ url_for('accounting.report_vat') }}"><div class="rf-kpi">
+    <div class="num">{{ '{:,}'.format(vat.net_vat) }}</div>
+    <div class="lbl">Net VAT position this month</div></div></a>
+</div>
+
+{# ---- Needs attention ---- #}
+<div class="rf-card p-3 mb-3">
+  <h6>Needs attention</h6>
+  <div class="d-flex gap-3 flex-wrap small">
+    {% if efris_pending or pending_invoices %}
+    <a href="{{ url_for('accounting.invoices', efris='pending') }}" class="text-decoration-none">
+      <span class="badge badge-warn">{{ pending_invoices }}</span> invoices awaiting EFRIS</a>
+    {% else %}
+    <span class="text-success">EFRIS queue empty ✓</span>
+    {% endif %}
+    {% if worklist_count %}
+    <a href="{{ url_for('accounting.inventory_worklist') }}" class="text-decoration-none">
+      <span class="badge badge-warn">{{ worklist_count }}</span> stocked items without valuation</a>
+    {% else %}
+    <span class="text-success">Every stocked item costed ✓</span>
+    {% endif %}
+    {% if ar.bucket_totals['90+'] %}
+    <a href="{{ url_for('accounting.report_ar') }}" class="text-decoration-none">
+      <span class="badge badge-danger">90+</span> debtors to chase</a>
+    {% endif %}
+  </div>
+</div>
+
+{# ---- My actions, by capability ---- #}
+<div class="rf-card p-3 mb-3">
+  <h6>Quick actions</h6>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if can_receipts %}<a class="btn btn-sm btn-primary" href="{{ url_for('accounting.receipt_new') }}"><i class="bi bi-cash-coin"></i> Record receipt</a>{% endif %}
+    {% if can_purchases %}<a class="btn btn-sm btn-primary" href="{{ url_for('accounting.purchase_new') }}"><i class="bi bi-bag"></i> Record purchase / expense</a>{% endif %}
+    {% if can_pay %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('accounting.payment_new') }}"><i class="bi bi-cash-stack"></i> Pay a supplier</a>{% endif %}
+    {% if can_reconcile %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('accounting.cash_bank') }}"><i class="bi bi-bank"></i> Reconcile bank &amp; cash</a>{% endif %}
+    {% if can_post %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('accounting.journal_new') }}"><i class="bi bi-journal-plus"></i> Manual journal</a>{% endif %}
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('accounting.fin_reports') }}"><i class="bi bi-file-earmark-bar-graph"></i> Financial reports</a>
+  </div>
+</div>
+
+{% if orders_view %}
+{# ---- The commercial pulse (CFO): orders and who placed them. Read-only. ---- #}
+<div class="rf-kpis" style="grid-template-columns:repeat(4,1fr)">
+  <a href="{{ url_for('orders.index') }}"><div class="rf-kpi">
+    <div class="num">{{ orders_view.n_open }}</div><div class="lbl">Orders in the pipeline</div></div></a>
+  <div class="rf-kpi"><div class="num">{{ '{:,.0f}'.format(orders_view.val_today) }}</div>
+    <div class="lbl">Sales today (net UGX)</div></div>
+  <div class="rf-kpi"><div class="num">{{ '{:,.0f}'.format(orders_view.val_week) }}</div>
+    <div class="lbl">Sales last 7 days (net UGX)</div></div>
+  <div class="rf-kpi"><div class="num">{{ orders_view.counts.get('submitted', 0) }}</div>
+    <div class="lbl">Awaiting acceptance</div></div>
+</div>
+
+<div class="rf-kpis" style="grid-template-columns:repeat(2,1fr)">
+  <a href="{{ url_for('approvals.index') }}"><div class="rf-kpi">
+    <div class="num {{ 'text-danger' if orders_view.approvals_pending }}">{{ orders_view.approvals_pending }}</div>
+    <div class="lbl">Price approvals waiting for sign-off</div></div></a>
+  <a href="{{ url_for('messages.index') }}"><div class="rf-kpi">
+    <div class="num {{ 'text-danger' if orders_view.unread_messages }}">{{ orders_view.unread_messages }}</div>
+    <div class="lbl">Unread customer messages</div></div></a>
+</div>
+
+<div class="rf-card p-3 mb-3">
+  <h6>Latest orders <a class="small ms-2" href="{{ url_for('orders.index') }}">all orders &rsaquo;</a></h6>
+  <table class="table table-sm table-hover mb-0">
+    <thead><tr><th>Order</th><th>Customer</th><th>Status</th>
+      <th class="text-end">Total</th><th class="small">Date</th></tr></thead>
+    <tbody>
+    {% for o in orders_view.recent %}
+      <tr onclick="window.location='{{ url_for('orders.detail', order_id=o.id) }}'" style="cursor:pointer">
+        <td class="fw-semibold">{{ o.number or '(draft)' }}</td>
+        <td class="small">{{ o.customer.name if o.customer else '—' }}</td>
+        <td class="small">{{ o.status|replace('_',' ')|title }}</td>
+        <td class="text-end">{{ o.currency }} {{ '{:,.0f}'.format(o.total or 0) }}</td>
+        <td class="small">{{ o.order_date.strftime('%d %b') if o.order_date else '' }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="text-muted text-center py-3">No orders yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{# ---- Recent postings ---- #}
+<div class="rf-card p-3">
+  <h6>Recent journal entries</h6>
+  <table class="table table-sm table-hover mb-0">
+    <tbody>
+    {% for e in recent %}
+      <tr onclick="window.location='{{ url_for('accounting.journal_view', entry_id=e.id) }}'" style="cursor:pointer">
+        <td class="fw-semibold">{{ e.entry_no }}</td>
+        <td class="small">{{ e.entry_date.strftime('%d %b') }}</td>
+        <td class="small">{{ e.memo or e.source_type }}</td>
+        <td class="text-end">{{ '{:,}'.format(e.total_debit) }}</td>
+      </tr>
+    {% else %}
+      <tr><td class="text-muted text-center py-3">The ledger is empty — the books start with the opening balances.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<p class="small text-muted mt-2">Inventory on the books: UGX {{ '{:,}'.format(inv_total) }}.
+Figures cover {{ month_from.strftime('%d %b') }}–{{ today.strftime('%d %b %Y') }}, posted entries only.</p>
+{% endblock %}

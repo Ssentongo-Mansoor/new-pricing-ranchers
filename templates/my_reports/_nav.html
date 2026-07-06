@@ -1,0 +1,9 @@
+{% set ep = request.endpoint or '' %}
+<ul class="nav nav-pills mb-3 flex-wrap gap-1">
+  <li class="nav-item"><a class="nav-link {{ 'active' if ep=='my_reports.index' }}" href="{{ url_for('my_reports.index') }}">Overview</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if ep=='my_reports.sales' }}" href="{{ url_for('my_reports.sales') }}">My sales</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if ep=='my_reports.customers' }}" href="{{ url_for('my_reports.customers') }}">My customers</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if ep=='my_reports.lapsed' }}" href="{{ url_for('my_reports.lapsed') }}">Win back</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if ep=='my_reports.reorder' }}" href="{{ url_for('my_reports.reorder') }}">Reorder due</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if ep=='my_reports.feedback' }}" href="{{ url_for('my_reports.feedback') }}">Feedback</a></li>
+</ul>

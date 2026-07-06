@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block heading %}Customer scorecard{% endblock %}
+{% block content %}
+{% include "reports/_nav.html" %}
+<form class="row g-2 align-items-end mb-3" method="get">
+  <div class="col-auto"><label class="form-label small mb-0">Months</label>
+    <input class="form-control form-control-sm" type="number" name="months" value="{{ months|length }}"></div>
+  <div class="col-auto"><button class="btn btn-sm btn-primary">Run</button></div>
+</form>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-6"><div class="rf-card p-3 h-100">
+    <h2 class="h6"><i class="bi bi-graph-up-arrow text-rf-orange"></i> Top growers ({{ prev }} → {{ last }})</h2>
+    <table class="table table-sm mb-0"><tbody>
+    {% for r in growers %}<tr><td>{{ r.name }} <span class="text-muted small">{{ r.currency }}</span></td>
+      <td class="text-end money">{{ r.cur|money(r.currency) }}</td>
+      <td class="text-end"><span class="badge badge-ok">+{{ '%.0f'|format(r.change) }}%</span></td></tr>
+    {% else %}<tr><td class="text-muted">No growth yet.</td></tr>{% endfor %}
+    </tbody></table>
+  </div></div>
+  <div class="col-lg-6"><div class="rf-card p-3 h-100">
+    <h2 class="h6"><i class="bi bi-graph-down-arrow text-rf-orange"></i> Top decliners</h2>
+    <table class="table table-sm mb-0"><tbody>
+    {% for r in decliners %}<tr><td>{{ r.name }} <span class="text-muted small">{{ r.currency }}</span></td>
+      <td class="text-end money">{{ r.cur|money(r.currency) }}</td>
+      <td class="text-end"><span class="badge badge-danger">{{ '%.0f'|format(r.change) }}%</span></td></tr>
+    {% else %}<tr><td class="text-muted">No declines.</td></tr>{% endfor %}
+    </tbody></table>
+  </div></div>
+</div>
+
+<div class="table-responsive rf-card">
+<table class="table table-sm align-middle mb-0">
+  <thead><tr><th>Customer</th><th>Ccy</th>{% for m in months %}<th class="text-end">{{ m }}</th>{% endfor %}<th class="text-end">Δ</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr><td class="fw-semibold">{{ r.name }}</td><td class="small">{{ r.currency }}</td>
+      {% for m in months %}<td class="text-end money">{{ r.vals.get(m,0)|money(r.currency) if r.vals.get(m) else '' }}</td>{% endfor %}
+      <td class="text-end">{% if r.change>0 %}<span class="text-success">+{{ '%.0f'|format(r.change) }}%</span>{% elif r.change<0 %}<span class="text-danger">{{ '%.0f'|format(r.change) }}%</span>{% else %}—{% endif %}</td></tr>
+  {% else %}<tr><td colspan="20" class="text-center text-muted py-3">No sales in this period.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

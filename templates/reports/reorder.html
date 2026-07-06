@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block heading %}Reorder due{% endblock %}
+{% block content %}
+{% include "reports/_nav.html" %}
+<p class="text-muted">Predicted next order date for each customer, from their average ordering interval. Call them before they run short.</p>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="rf-stat"><div class="num text-danger">{{ overdue|length }}</div><div class="lbl">Overdue</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-stat"><div class="num">{{ due_soon|length }}</div><div class="lbl">Due within 7 days</div></div></div>
+</div>
+
+<div class="table-responsive rf-card">
+<table class="table table-sm align-middle mb-0">
+  <thead><tr><th>Customer</th><th class="text-end">Orders</th><th class="text-end">Avg interval</th><th>Last order</th><th>Predicted next</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr class="{{ 'table-warning' if r.due_in < 0 }}">
+      <td class="fw-semibold"><a href="{{ url_for('reports.customer_insights', customer_id=r.customer.id) }}">{{ r.customer.name }}</a></td>
+      <td class="text-end">{{ r.orders }}</td>
+      <td class="text-end">{{ r.avg }}d</td>
+      <td class="small">{{ r.last }}</td>
+      <td class="small">{{ r.predicted }}</td>
+      <td>{% if r.due_in < 0 %}<span class="badge badge-danger">overdue {{ -r.due_in }}d</span>
+          {% elif r.due_in <= 7 %}<span class="badge badge-warn">due in {{ r.due_in }}d</span>
+          {% else %}<span class="badge bg-secondary">in {{ r.due_in }}d</span>{% endif %}</td>
+    </tr>
+  {% else %}<tr><td colspan="6" class="text-center text-muted py-3">Not enough order history yet to predict reorders.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block heading %}Bulk adjust · {{ pl.name }}{% endblock %}
+{% block content %}
+<a href="{{ url_for(back_endpoint, list_id=pl.id) }}" class="small">&larr; Back to pricelist</a>
+<div class="rf-card p-4 mt-2">
+  <form method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label">Scope: category</label>
+        <select class="form-select" name="category">
+          <option value="">Whole list</option>
+          {% for c in categories %}<option value="{{ c }}" {{ 'selected' if form.get('category')==c }}>{{ c }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Scope: tier</label>
+        <select class="form-select" name="tier">
+          <option value="__all__">All tiers</option>
+          {% for t in tiers %}<option value="{{ t.key }}" {{ 'selected' if form.get('tier')==t.key }}>{{ t.label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Change type</label>
+        <select class="form-select" name="mode">
+          <option value="pct" {{ 'selected' if form.get('mode')=='pct' }}>Percentage %</option>
+          <option value="fixed" {{ 'selected' if form.get('mode')=='fixed' }}>Fixed amount</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Amount</label>
+        <input class="form-control" name="amount" value="{{ form.get('amount','') }}" placeholder="e.g. 5 or -2.5">
+      </div>
+    </div>
+    <p class="small text-muted mt-2">Percentage applies multiplicatively (5 = +5%). Fixed adds the amount to each price. Preview before you commit.</p>
+    <button class="btn btn-outline-primary" name="commit" value="0">Preview</button>
+    {% if preview is not none %}
+      <button class="btn btn-primary" name="commit" value="1">Apply {{ preview_count }} change(s)</button>
+    {% endif %}
+  </form>
+</div>
+
+{% if preview is not none %}
+<div class="rf-card mt-3 p-0">
+  <div class="p-3"><strong>{{ preview_count }}</strong> price(s) will change{% if preview_count > preview|length %} (showing first {{ preview|length }}){% endif %}.</div>
+  <div class="table-responsive">
+  <table class="table table-sm mb-0">
+    <thead><tr><th>Art</th><th>Description</th><th>Tier</th><th class="text-end">Old</th><th class="text-end">New</th></tr></thead>
+    <tbody>
+      {% for p in preview %}
+      <tr><td>{{ p.art }}</td><td>{{ p.desc }}</td><td>{{ p.tier }}</td>
+        <td class="text-end money">{{ p.old }}</td><td class="text-end money fw-semibold">{{ p.new }}</td></tr>
+      {% else %}<tr><td colspan="5" class="text-muted text-center py-3">No prices match this scope.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

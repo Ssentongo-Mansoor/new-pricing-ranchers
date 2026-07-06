@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block heading %}Production — to produce{% endblock %}
+{% block content %}
+<p class="text-muted">Products where open-order demand is greater than stock on hand. Make the suggested quantity to cover demand. Soonest delivery first.</p>
+<div class="d-flex gap-2 mb-3">
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('production.orders') }}"><i class="bi bi-cart-check"></i> Open orders</a>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('production.stock') }}"><i class="bi bi-boxes"></i> Stock vs demand</a>
+</div>
+{% if not rows %}
+  <div class="alert alert-success">Nothing to produce. Stock covers all open-order demand.</div>
+{% else %}
+<div class="table-responsive">
+<table class="table table-hover align-middle">
+  <thead><tr>
+    <th>Product</th><th>Pack</th><th>Needed by</th>
+    <th class="text-end">Demand</th><th class="text-end">In stock</th>
+    <th class="text-end">Produce</th>
+    {% if can_record %}<th style="min-width:260px">Record produced</th>{% endif %}
+  </tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td><a href="{{ url_for('production.product_detail', product_id=r.product.id) }}">{{ r.product.description }}</a>
+          <div class="text-muted small">{{ r.product.article_no }}</div></td>
+      <td class="small text-muted">{{ r.pack_size }}</td>
+      <td class="small">{{ r.earliest.strftime('%d %b %Y') if r.earliest else '—' }}</td>
+      <td class="text-end">{{ '%g'|format(r.demand) }} <span class="text-muted small">{{ r.uom }}</span></td>
+      <td class="text-end">{{ '%g'|format(r.on_hand) }}</td>
+      <td class="text-end fw-semibold text-danger">{{ '%g'|format(r.shortfall) }}</td>
+      {% if can_record %}
+      <td>
+        <form method="post" action="{{ url_for('production.produce', product_id=r.product.id) }}" class="d-flex gap-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="next" value="{{ url_for('production.index') }}">
+          <input type="number" step="any" min="0" name="qty" value="{{ '%g'|format(r.shortfall) }}" class="form-control form-control-sm" style="max-width:110px" required>
+          <input type="text" name="lot_number" placeholder="lot (auto)" class="form-control form-control-sm" style="max-width:120px">
+          <input type="text" name="note" placeholder="note" class="form-control form-control-sm">
+          <button class="btn btn-sm btn-primary" type="submit">Record</button>
+        </form>
+      </td>
+      {% endif %}
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% if not can_record %}
+<div class="alert alert-secondary small">You can view what needs producing. Recording production is the Production Manager's task.</div>
+{% endif %}
+{% endblock %}

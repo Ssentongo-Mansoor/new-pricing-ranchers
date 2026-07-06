@@ -1,0 +1,35 @@
+{% extends "costing/_shell.html" %}
+{% block heading %}Carcass Cuts{% endblock %}
+{% block costing_content %}
+<div class="page-head">
+  <h1>Carcass Cuts</h1>
+  <div class="spacer"></div>
+  {% if has_perm(current_user, 'edit_costing') %}<a class="btn btn-sm btn-rf" href="{{ url_for('cuts.new') }}"><i class="bi bi-plus-lg"></i> New Carcass</a>{% endif %}
+</div>
+<p class="text-muted small">Break a carcass into cuts, cost each cut per kg, and push those costs to the ingredient master so recipes update.</p>
+<div class="card"><div class="card-body">
+  <table class="table table-hover align-middle">
+    <thead><tr>
+      <th>Carcass</th><th>Species</th><th class="num">Weight</th><th class="num">Landed cost</th>
+      <th class="num">Cuts</th><th class="num">Loss %</th><th class="num">Profit</th><th>Method</th><th></th>
+    </tr></thead>
+    <tbody>
+      {% for c, b in rows %}
+      <tr>
+        <td class="fw-semibold"><a href="{{ url_for('cuts.view', cid=c.id) }}" class="text-decoration-none">{{ c.label }}</a></td>
+        <td><span class="badge bg-light text-dark">{{ c.species }}</span></td>
+        <td class="num">{{ '%.1f'|format(c.carcass_weight_kg) }} kg</td>
+        <td class="num">{{ b.landed_cost|money }}</td>
+        <td class="num">{{ c.cuts|length }}</td>
+        <td class="num">{{ '%.1f'|format(b.loss_pct) }}%</td>
+        <td class="num {{ 'text-success' if b.profit>=0 else 'text-danger' }}">{{ b.profit|money }}</td>
+        <td class="small text-muted">{{ 'Market value' if b.used_value else 'By weight' }}</td>
+        <td><a class="btn btn-sm btn-outline-secondary py-0" href="{{ url_for('cuts.view', cid=c.id) }}"><i class="bi bi-eye"></i></a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="9" class="text-center text-muted py-4">No carcasses yet. Add one to start cut costing.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+{% endblock %}

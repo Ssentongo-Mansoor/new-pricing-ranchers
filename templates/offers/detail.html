@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block heading %}Quote {{ offer.number }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start mb-3 gap-2">
+  <div>
+    <span class="badge bg-secondary">{{ offer.currency }}</span>
+    {% if offer.vat_applicable %}<span class="badge bg-dark">VAT {{ offer.vat_rate|int }}%</span>
+    {% else %}<span class="badge badge-ok">Zero-rated (export)</span>{% endif %}
+    {% if offer.source_pricelist and offer.source_pricelist.price_basis == 'kg' %}<span class="badge" style="background:#6E7149" title="Wholesale/HORECA prices are per kilogram">prices per kg</span>{% endif %}
+    {% if offer.status=='issued' %}<span class="badge bg-dark">issued</span>
+    {% elif offer.status=='converted' %}<span class="badge badge-ok">converted to order</span>
+    {% elif offer.status=='not_ordered' %}<span class="badge badge-warn">not ordered</span>
+    {% elif offer.status=='archived' %}<span class="badge bg-secondary">archived</span>
+    {% else %}<span class="badge bg-secondary">draft</span>{% endif %}
+    <div class="small text-muted mt-1">
+      Customer: <strong>{{ offer.customer.name }}</strong>
+      · from {{ offer.source_pricelist.name if offer.source_pricelist else '—' }}
+      · valid {{ offer.valid_from }} → {{ offer.valid_until or '—' }}
+      {% if offer.currency=='USD' and offer.exchange_rate_value %} · rate UGX {{ '%.0f'|format(offer.exchange_rate_value) }}/USD (stamped){% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('offers.export', offer_id=offer.id, fmt='xlsx') }}"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('offers.export', offer_id=offer.id, fmt='pdf', view=1) }}" target="_blank"><i class="bi bi-eye"></i> View</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('offers.export', offer_id=offer.id, fmt='pdf') }}"><i class="bi bi-download"></i> PDF</a>
+    {% if offer.status=='draft' %}
+    <form method="post" action="{{ url_for('offers.issue', offer_id=offer.id) }}" onsubmit="return confirm('Issue and lock this offer? The exchange rate will be fixed on it.')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-sm btn-primary"><i class="bi bi-lock"></i> Issue</button>
+    </form>
+    {% endif %}
+    {% if offer.status in ['draft','issued'] %}
+    <form method="post" action="{{ url_for('offers.convert_to_order', offer_id=offer.id) }}" onsubmit="return confirm('Customer confirmed? Convert this offer into an order. It will go to the fulfilment inbox.')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-sm btn-primary"><i class="bi bi-cart-check"></i> Convert to order</button>
+    </form>
+    <form method="post" action="{{ url_for('offers.mark_not_ordered', offer_id=offer.id) }}" onsubmit="return confirm('File this offer as “not ordered”?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle"></i> Not ordered</button>
+    </form>
+    {% endif %}
+    {% if offer.status in ['not_ordered','archived'] %}
+    <form method="post" action="{{ url_for('offers.reopen', offer_id=offer.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-counterclockwise"></i> Reopen</button>
+    </form>
+    {% endif %}
+    {% if offer.status not in ['archived','converted'] %}
+    <form method="post" action="{{ url_for('offers.archive', offer_id=offer.id) }}" onsubmit="return confirm('Archive this offer? It will be filed as a record at its current prices.')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-archive"></i> Archive</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if offer.converted_order %}
+<div class="alert alert-success py-2"><i class="bi bi-cart-check"></i>
+  This quote was converted to order
+  <a href="{{ url_for('orders.detail', order_id=offer.converted_order.id) }}">{{ offer.converted_order.number }}</a>.</div>
+{% endif %}
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="rf-card p-0">
+      <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Art</th><th>Description</th><th>Pack size</th><th>Tier</th><th class="text-end">{{ 'Qty (kg)' if (offer.source_pricelist and offer.source_pricelist.price_basis == 'kg') else 'Qty' }}</th><th class="text-end">Unit excl VAT</th><th class="text-end">Unit incl VAT</th><th class="text-end">Disc%</th><th class="text-end">Total incl VAT</th>{% if offer.status=='draft' %}<th></th>{% endif %}</tr></thead>
+        <tbody>
+        {% for l in offer.lines %}
+          <tr>
+            <td>{{ l.article_no }}</td>
+            <td>{{ l.description }}{% if l.is_fixed %} <span class="badge badge-fixed">fixed</span>{% endif %}</td>
+            <td class="small">{{ l.pack_size }}</td>
+            <td class="small">{{ l.tier_label }}</td>
+            <td class="text-end">{{ l.quantity }}</td>
+            <td class="text-end money">{{ l.unit_price|money(offer.currency) }}</td>
+            {% set vf = (1 + offer.vat_rate/100.0) if (offer.vat_applicable and l.is_vatable) else 1.0 %}
+            <td class="text-end money">{{ (l.unit_price|float * vf)|money(offer.currency) }}</td>
+            <td class="text-end">{{ l.discount_pct|int }}</td>
+            <td class="text-end money fw-semibold">{{ (l.line_total|float * vf)|money(offer.currency) }}</td>
+            {% if offer.status=='draft' %}
+            <td class="text-end"><form method="post" action="{{ url_for('offers.remove_line', offer_id=offer.id, line_id=l.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger py-0 px-1"><i class="bi bi-trash"></i></button></form></td>
+            {% endif %}
+          </tr>
+        {% else %}<tr><td colspan="10" class="text-center text-muted py-3">No lines yet. Add products below.</td></tr>{% endfor %}
+        </tbody>
+        <tfoot>
+          <tr><td colspan="7"></td><td class="text-end">Subtotal (excl VAT)</td><td class="text-end money">{{ offer.subtotal|money(offer.currency) }}</td>{% if offer.status=='draft' %}<td></td>{% endif %}</tr>
+          <tr><td colspan="7"></td><td class="text-end">{{ 'VAT '~(offer.vat_rate|int)~'%' if offer.vat_applicable else 'VAT' }}</td><td class="text-end money">{{ offer.vat_amount|money(offer.currency) if offer.vat_applicable else 'Zero-rated' }}</td>{% if offer.status=='draft' %}<td></td>{% endif %}</tr>
+          <tr class="fw-bold"><td colspan="7"></td><td class="text-end">TOTAL (incl VAT)</td><td class="text-end money text-rf-orange">{{ offer.total|money(offer.currency) }}</td>{% if offer.status=='draft' %}<td></td>{% endif %}</tr>
+        </tfoot>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    {% if offer.status=='draft' %}
+    <div class="rf-card p-3 mb-3">
+      <h2 class="h6">Add a line</h2>
+      <input class="form-control form-control-sm mb-2" id="prodSearch" placeholder="Search article no / description" autocomplete="off">
+      <div id="results" class="list-group small mb-2" style="max-height:220px; overflow:auto"></div>
+      <form method="post" action="{{ url_for('offers.add_line', offer_id=offer.id) }}" id="addForm" class="d-none">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="line_id" id="f_line">
+        <div class="mb-2 small">Selected: <strong id="f_label">—</strong></div>
+        <div class="mb-2"><label class="form-label small">Tier</label>
+          <select class="form-select form-select-sm" name="tier" id="f_tier"></select></div>
+        <div class="row g-2">
+          <div class="col-6"><label class="form-label small">Quantity</label>
+            <input class="form-control form-control-sm" name="quantity" value="1" type="number" step="any"></div>
+          <div class="col-6"><label class="form-label small">Discount %</label>
+            <input class="form-control form-control-sm" name="discount_pct" value="0" type="number" step="any"></div>
+        </div>
+        <div class="form-check my-2">
+          <input class="form-check-input" type="checkbox" name="use_fixed" value="1" id="f_usefixed" onchange="document.getElementById('fixedbox').classList.toggle('d-none', !this.checked)">
+          <label class="form-check-label small" for="f_usefixed">Fixed price for this line</label>
+        </div>
+        <div id="fixedbox" class="d-none mb-2">
+          <input class="form-control form-control-sm mb-1" name="fixed_price" placeholder="Fixed unit price ({{ offer.currency }})" type="number" step="any">
+          <input class="form-control form-control-sm" name="fixed_note" placeholder="Note (optional)">
+        </div>
+        <button class="btn btn-sm btn-primary w-100">Add to quote</button>
+      </form>
+    </div>
+    {% endif %}
+
+    <div class="rf-card p-3 mb-3">
+      <h2 class="h6">Quote details</h2>
+      <form method="post" action="{{ url_for('offers.update_settings', offer_id=offer.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-2"><label class="form-label small">Valid until</label>
+          <input class="form-control form-control-sm" type="date" name="valid_until" value="{{ offer.valid_until or '' }}"></div>
+        <div class="mb-2"><label class="form-label small">Notes</label>
+          <textarea class="form-control form-control-sm" name="notes" rows="2">{{ offer.notes or '' }}</textarea></div>
+        <button class="btn btn-sm btn-outline-secondary">Save details</button>
+      </form>
+    </div>
+
+    <div class="rf-card p-3">
+      <h2 class="h6">Save as customer pricelist</h2>
+      <form method="post" action="{{ url_for('offers.promote', offer_id=offer.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input class="form-control form-control-sm mb-2" name="name" placeholder="New list name (optional)">
+        <button class="btn btn-sm btn-outline-primary w-100">Promote to customer pricelist</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+{% if offer.status=='draft' %}
+<script>
+const searchUrl = "{{ url_for('offers.search_products', offer_id=offer.id) }}";
+const box = document.getElementById('prodSearch');
+const results = document.getElementById('results');
+let timer=null;
+box.addEventListener('input', function(){
+  clearTimeout(timer);
+  timer = setTimeout(runSearch, 200);
+});
+function runSearch(){
+  fetch(searchUrl + '?q=' + encodeURIComponent(box.value))
+    .then(r=>r.json()).then(function(d){
+      results.innerHTML='';
+      d.results.forEach(function(item){
+        const a=document.createElement('a');
+        a.href='#'; a.className='list-group-item list-group-item-action';
+        const strong=document.createElement('strong'); strong.textContent=item.article_no;
+        a.appendChild(strong); a.appendChild(document.createTextNode(' '+(item.description||'')+' '));
+        const packSpan=document.createElement('span'); packSpan.className='text-muted'; packSpan.textContent=(item.pack_size||'');
+        a.appendChild(packSpan);
+        a.onclick=function(e){ e.preventDefault(); select(item); };
+        results.appendChild(a);
+      });
+      if(!d.results.length) results.innerHTML='<div class="text-muted p-2">No matches.</div>';
+    });
+}
+function select(item){
+  document.getElementById('addForm').classList.remove('d-none');
+  document.getElementById('f_line').value=item.line_id;
+  document.getElementById('f_label').textContent=item.article_no+' · '+item.description;
+  const tier=document.getElementById('f_tier'); tier.innerHTML='';
+  item.tiers.forEach(function(t){
+    if(t.price===null) return;
+    const o=document.createElement('option'); o.value=t.key;
+    o.textContent=t.label+' ('+item.currency+' '+t.price.toLocaleString()+')';
+    tier.appendChild(o);
+  });
+  results.innerHTML=''; box.value='';
+}
+</script>
+{% endif %}
+{% endblock %}

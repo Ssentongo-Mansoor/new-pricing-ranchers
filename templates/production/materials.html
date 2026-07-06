@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block heading %}Production — raw materials{% endblock %}
+{% block content %}
+<p class="text-muted">Raw materials needed to produce the current shortfall across {{ n_products }} product(s), against store stock. Shortfalls and unmatched items first.</p>
+<div class="mb-3">
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('production.index') }}"><i class="bi bi-hammer"></i> To produce</a>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('production.recipes') }}"><i class="bi bi-link-45deg"></i> Recipe links</a>
+</div>
+
+{% if unmapped %}
+<div class="alert alert-warning">
+  {{ unmapped|length }} product(s) need production but have no recipe linked, so their materials are not counted:
+  {% for p in unmapped %}<a href="{{ url_for('production.product_detail', product_id=p.id) }}">{{ p.article_no }}</a>{{ ", " if not loop.last }}{% endfor %}.
+</div>
+{% endif %}
+
+{% if not needs %}
+  <div class="alert alert-info">No raw materials required. Either nothing is short, or short products have no recipe linked yet.</div>
+{% else %}
+<div class="table-responsive">
+<table class="table table-hover align-middle">
+  <thead><tr>
+    <th>Raw material</th><th class="text-end">Needed (kg)</th>
+    <th class="text-end">In store</th><th class="text-end">Short</th><th>Match</th>
+  </tr></thead>
+  <tbody>
+  {% for n in needs %}
+    <tr class="{{ 'table-warning' if n.short and n.short > 0 }}">
+      <td>{{ n.name }}</td>
+      <td class="text-end">{{ '%.3f'|format(n.kg_needed) }}</td>
+      <td class="text-end">{% if n.matched %}{{ '%g'|format(n.on_hand) }} <span class="text-muted small">{{ n.uom }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+      <td class="text-end {{ 'fw-semibold text-danger' if n.short and n.short > 0 }}">{% if n.matched %}{{ '%.3f'|format(n.short) }}{% else %}—{% endif %}</td>
+      <td>{% if n.matched %}<span class="badge badge-ok">in store</span>{% else %}<span class="badge badge-warn">not matched</span>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="text-muted small">Not matched means no store item name lines up with the recipe ingredient. Link those by naming the store item to match, or treat the need as a buy list.</p>
+{% endif %}
+{% endblock %}

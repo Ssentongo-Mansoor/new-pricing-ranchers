@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block heading %}Profit & loss{% endblock %}
+{% block content %}
+{% include "accounting/_tb_badge.html" %}
+{% include "accounting/_period_form.html" %}
+
+<div class="rf-card p-3">
+<table class="table table-sm align-middle mb-0">
+  <tbody>
+    <tr class="fw-semibold"><td colspan="2">Income</td></tr>
+    {% for a, v in r.sections.income %}
+    <tr><td class="ps-4">{{ a.code }} · {{ a.name }}</td><td class="text-end">{{ '{:,}'.format(v) }}</td></tr>
+    {% endfor %}
+    <tr class="fw-semibold border-top"><td>Total income</td><td class="text-end">{{ '{:,}'.format(r.totals.income) }}</td></tr>
+
+    <tr class="fw-semibold"><td colspan="2" class="pt-3">Cost of goods sold</td></tr>
+    {% for a, v in r.sections.cogs %}
+    <tr><td class="ps-4">{{ a.code }} · {{ a.name }}</td><td class="text-end">{{ '{:,}'.format(v) }}</td></tr>
+    {% endfor %}
+    <tr class="fw-semibold border-top"><td>Total COGS</td><td class="text-end">{{ '{:,}'.format(r.totals.cogs) }}</td></tr>
+
+    <tr class="table-active fw-semibold"><td>GROSS PROFIT
+      {% if r.margin_pct is not none %}<span class="badge {{ 'badge-ok' if r.margin_pct >= 25 else 'badge-warn' }} ms-2">{{ '%.1f'|format(r.margin_pct) }}%</span>{% endif %}</td>
+      <td class="text-end">{{ '{:,}'.format(r.gross_profit) }}</td></tr>
+
+    <tr class="fw-semibold"><td colspan="2" class="pt-3">Operating & other expenses</td></tr>
+    {% for a, v in r.sections.expense %}
+    <tr><td class="ps-4">{{ a.code }} · {{ a.name }}</td><td class="text-end">{{ '{:,}'.format(v) }}</td></tr>
+    {% endfor %}
+    <tr class="fw-semibold border-top"><td>Total expenses</td><td class="text-end">{{ '{:,}'.format(r.totals.expense) }}</td></tr>
+
+    <tr class="table-active fw-semibold fs-6"><td>NET PROFIT</td>
+      <td class="text-end">{{ '{:,}'.format(r.net_profit) }}</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="small text-muted mt-2">UGX, posted entries only, {{ dfrom.strftime('%d %b %Y') }} to
+{{ dto.strftime('%d %b %Y') }}. The gross margin is real: revenue net of VAT against
+weighted-average COGS. Lines sold without valuation carry no COGS and show on
+their invoices — cost those items to tighten this figure.</p>
+<a class="btn btn-link px-0" href="{{ url_for('accounting.fin_reports') }}">&larr; All reports</a>
+{% endblock %}

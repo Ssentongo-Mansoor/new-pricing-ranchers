@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block heading %}Reports{% endblock %}
+{% macro ugx(v) %}UGX {{ '{:,.0f}'.format(v or 0) }}{% endmacro %}
+{% block content %}
+{% include "reports/_nav.html" %}
+
+<!-- month-to-date snapshot (operational) -->
+<div class="d-flex justify-content-between align-items-baseline mb-2 flex-wrap">
+  <h2 class="h6 mb-0"><i class="bi bi-activity text-rf-orange"></i> This month — {{ snap.mtd_label }}</h2>
+  <span class="small">
+    <strong>{{ ugx(snap.mtd) }}</strong>
+    {% if snap.mtd_delta is not none %}
+      {% if snap.mtd_delta >= 0 %}<span style="color:#2E7D32">▲ {{ '%.0f'|format(snap.mtd_delta) }}% vs last month</span>
+      {% else %}<span style="color:#ED1C24">▼ {{ '%.0f'|format(-snap.mtd_delta) }}% vs last month</span>{% endif %}
+    {% endif %}
+    · <a href="{{ url_for('reports.all_time') }}">all-time report ›</a>
+  </span>
+</div>
+<div class="row g-3 mb-4">
+  <div class="col-lg-6"><a class="text-decoration-none" href="{{ url_for('reports.sales') }}">
+    <div class="rf-card p-3 h-100">
+      <div class="d-flex justify-content-between"><span class="small fw-semibold text-dark"><i class="bi bi-graph-up-arrow text-rf-orange"></i> Last 6 months (this month highlighted)</span><span class="small text-muted">open ›</span></div>
+      <canvas id="snapTrend" height="150"></canvas>
+    </div></a></div>
+  <div class="col-lg-3"><a class="text-decoration-none" href="{{ url_for('reports.sales', group='category') }}">
+    <div class="rf-card p-3 h-100">
+      <div class="d-flex justify-content-between"><span class="small fw-semibold text-dark"><i class="bi bi-pie-chart text-rf-orange"></i> This month by channel</span><span class="small text-muted">open ›</span></div>
+      {% if snap.chan_labels %}<canvas id="snapChan" height="180"></canvas>
+      {% else %}<p class="text-muted small mt-3 mb-0">No sales yet this month.</p>{% endif %}
+    </div></a></div>
+  <div class="col-lg-3"><a class="text-decoration-none" href="{{ url_for('reports.sales', group='customer') }}">
+    <div class="rf-card p-3 h-100">
+      <div class="d-flex justify-content-between"><span class="small fw-semibold text-dark"><i class="bi bi-people text-rf-orange"></i> This month top customers</span><span class="small text-muted">open ›</span></div>
+      {% if snap.cust_labels %}<canvas id="snapCust" height="180"></canvas>
+      {% else %}<p class="text-muted small mt-3 mb-0">No sales yet this month.</p>{% endif %}
+    </div></a></div>
+</div>
+
+<!-- Fulfilment snapshot -->
+<div class="d-flex justify-content-between align-items-baseline mb-2 flex-wrap">
+  <h2 class="h6 mb-0"><i class="bi bi-box-seam text-rf-orange"></i> Fulfilment performance</h2>
+  <span class="small text-muted">fill rate = units delivered ÷ units ordered</span>
+</div>
+<div class="row g-3 mb-4">
+  <div class="col-lg-3"><a class="text-decoration-none" href="{{ url_for('reports.fulfilment') }}">
+    <div class="rf-card p-3 h-100 text-center">
+      <div class="text-muted small text-uppercase">Fill rate today</div>
+      <div class="num" style="font-size:2.4rem; color:{{ '#2E7D32' if (snap.fill_today is not none and snap.fill_today>=95) else '#F47A21' if snap.fill_today is not none else '#6B6B6B' }}">
+        {% if snap.fill_today is none %}—{% else %}{{ '%g'|format(snap.fill_today) }}%{% endif %}</div>
+      <div class="small text-muted">{{ snap.n_delivered_today }} delivered today
+        {% if snap.short_today %} · <span class="text-danger">{{ snap.short_today }} short line(s)</span>{% endif %}</div>
+      <hr class="my-2">
+      <div class="small">30-day fill rate: <strong>{% if snap.fill_30 is none %}—{% else %}{{ '%g'|format(snap.fill_30) }}%{% endif %}</strong></div>
+    </div></a></div>
+  <div class="col-lg-9"><a class="text-decoration-none" href="{{ url_for('reports.fulfilment_perf') }}">
+    <div class="rf-card p-3 h-100">
+      <div class="d-flex justify-content-between"><span class="small fw-semibold text-dark"><i class="bi bi-speedometer2 text-rf-orange"></i> Daily fill rate (last 30 days)</span><span class="small text-muted">open KPIs ›</span></div>
+      <canvas id="snapFill" height="120"></canvas>
+    </div></a></div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3"><div class="rf-stat">
+    <div class="num">{{ n_today }}</div><div class="lbl">Orders today</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-stat">
+    <div class="num" style="font-size:1.2rem">
+      {% for cur, v in val_today.items() %}{{ v|money(cur) }}<br>{% else %}—{% endfor %}</div>
+    <div class="lbl">Value today</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-stat">
+    <div class="num">{{ n_pending }}</div><div class="lbl">Pending (stock)</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-stat">
+    <div class="num">{{ n_backorders }}</div><div class="lbl">Open back orders</div></div></div>
+</div>
+
+{% if n_at_risk %}
+<a class="text-decoration-none" href="{{ url_for('reports.lapsed') }}">
+<div class="alert alert-warning d-flex align-items-center gap-2"><i class="bi bi-exclamation-triangle fs-5"></i>
+  <span><strong>{{ n_at_risk }}</strong> customer(s) have gone quiet (no order in 60 days). Review the Lapsed &amp; at-risk report to win them back.</span></div></a>
+{% endif %}
+
+<div class="row g-3">
+  {% if can_view_report(current_user,'fulfilment') %}<div class="col-lg-4"><a class="text-decoration-none" href="{{ url_for('reports.fulfilment') }}">
+    <div class="rf-card p-4 h-100"><h2 class="h6"><i class="bi bi-box-seam text-rf-orange"></i> Daily fulfilment</h2>
+      <p class="small text-muted mb-0">What was fulfilled vs ordered, fill rate, and the items missed (out of stock / not delivered).</p></div></a></div>{% endif %}
+  {% if can_view_report(current_user,'sales') %}<div class="col-lg-4"><a class="text-decoration-none" href="{{ url_for('reports.sales') }}">
+    <div class="rf-card p-4 h-100"><h2 class="h6"><i class="bi bi-cash-coin text-rf-orange"></i> Sales</h2>
+      <p class="small text-muted mb-0">Sales by total, customer, product or rep for any date range, split by currency.</p></div></a></div>{% endif %}
+  {% if can_view_report(current_user,'customer_insights') %}<div class="col-lg-4"><a class="text-decoration-none" href="{{ url_for('reports.customer_insights') }}">
+    <div class="rf-card p-4 h-100"><h2 class="h6"><i class="bi bi-person-lines-fill text-rf-orange"></i> Customer insights</h2>
+      <p class="small text-muted mb-0">A customer's product mix and trends — what's growing, and what they've stopped buying.</p></div></a></div>{% endif %}
+  {% if can_view_report(current_user,'lapsed') %}<div class="col-lg-4"><a class="text-decoration-none" href="{{ url_for('reports.lapsed') }}">
+    <div class="rf-card p-4 h-100"><h2 class="h6"><i class="bi bi-exclamation-triangle text-rf-orange"></i> Lapsed &amp; at-risk</h2>
+      <p class="small text-muted mb-0">Customers who've gone quiet and products they've dropped — so you can act early.</p></div></a></div>{% endif %}
+  {% if can_view_report(current_user,'reorder') %}<div class="col-lg-4"><a class="text-decoration-none" href="{{ url_for('reports.reorder') }}">
+    <div class="rf-card p-4 h-100"><h2 class="h6"><i class="bi bi-alarm text-rf-orange"></i> Reorder due</h2>
+      <p class="small text-muted mb-0">Predicted next order per customer — who's due or overdue.</p></div></a></div>{% endif %}
+  {% if can_view_report(current_user,'scorecard') %}<div class="col-lg-4"><a class="text-decoration-none" href="{{ url_for('reports.scorecard') }}">
+    <div class="rf-card p-4 h-100"><h2 class="h6"><i class="bi bi-table text-rf-orange"></i> Customer scorecard</h2>
+      <p class="small text-muted mb-0">Month-on-month spend, top growers and decliners.</p></div></a></div>{% endif %}
+  {% if can_view_report(current_user,'velocity') %}<div class="col-lg-4"><a class="text-decoration-none" href="{{ url_for('reports.velocity') }}">
+    <div class="rf-card p-4 h-100"><h2 class="h6"><i class="bi bi-lightning-charge text-rf-orange"></i> Product velocity</h2>
+      <p class="small text-muted mb-0">Fastest movers, decliners and units per week.</p></div></a></div>{% endif %}
+  {% if can_view_report(current_user,'fulfilment_perf') %}<div class="col-lg-4"><a class="text-decoration-none" href="{{ url_for('reports.fulfilment_perf') }}">
+    <div class="rf-card p-4 h-100"><h2 class="h6"><i class="bi bi-speedometer2 text-rf-orange"></i> Fulfilment KPIs</h2>
+      <p class="small text-muted mb-0">Fill rate, on-time dispatch and most-short products.</p></div></a></div>{% endif %}
+  {% if can_view_report(current_user,'offers') %}<div class="col-lg-4"><a class="text-decoration-none" href="{{ url_for('reports.offers_report') }}">
+    <div class="rf-card p-4 h-100"><h2 class="h6"><i class="bi bi-receipt text-rf-orange"></i> Quote conversion</h2>
+      <p class="small text-muted mb-2">How many quotes turned into orders.</p>
+      {% if conv_rate is not none %}<div class="num text-rf-orange" style="font-family:'RF Heading'">{{ '%.0f'|format(conv_rate) }}%</div>
+      <div class="small text-muted">{{ n_won }} of {{ n_decided }} decided quotes won</div>{% endif %}</div></a></div>{% endif %}
+  {% if can_view_report(current_user,'feedback') %}<div class="col-lg-4"><a class="text-decoration-none" href="{{ url_for('reports.feedback') }}">
+    <div class="rf-card p-4 h-100"><h2 class="h6"><i class="bi bi-star text-rf-orange"></i> Customer feedback</h2>
+      <p class="small text-muted mb-0">Delivery ratings over time, the score breakdown, and low-score orders to follow up.</p></div></a></div>{% endif %}
+  {% if can_view_report(current_user,'history') %}<div class="col-lg-4"><a class="text-decoration-none" href="{{ url_for('reports.sales_history') }}">
+    <div class="rf-card p-4 h-100"><h2 class="h6"><i class="bi bi-clock-history text-rf-orange"></i> Sales history</h2>
+      <p class="small text-muted mb-0">Invoiced sales 2024–2026: yearly totals, top customers and products, returns.</p></div></a></div>{% endif %}
+  {% if can_view_report(current_user,'product_month') %}<div class="col-lg-4"><a class="text-decoration-none" href="{{ url_for('reports.products_monthly') }}">
+    <div class="rf-card p-4 h-100"><h2 class="h6"><i class="bi bi-lightning-charge text-rf-orange"></i> Products by month</h2>
+      <p class="small text-muted mb-0">Per-month product sales, trend per product, and what has stopped selling.</p></div></a></div>{% endif %}
+  {% if can_view_report(current_user,'all_time') %}<div class="col-lg-4"><a class="text-decoration-none" href="{{ url_for('reports.all_time') }}">
+    <div class="rf-card p-4 h-100"><h2 class="h6"><i class="bi bi-trophy text-rf-orange"></i> All-time report</h2>
+      <p class="small text-muted mb-0">Overall performance: best customers, best products, best months and salespeople.</p></div></a></div>{% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script>
+const RF = {orange:'#F47A21', olive:'#6E7149', green:'#2E7D32', amber:'#F9A03F', red:'#ED1C24', dark:'#2B2B2B'};
+const PALETTE = [RF.orange, RF.olive, RF.green, RF.amber, RF.red, RF.dark, '#8D6E63', '#4E7CA1'];
+const ugxTick = v => 'UGX ' + Number(v).toLocaleString();
+
+(function(){
+  const ctx = document.getElementById('snapTrend');
+  if (!ctx) return;
+  const vals = {{ snap.trend_values|tojson }};
+  const colors = vals.map((_,i)=> i===vals.length-1 ? RF.orange : '#e7d9c6');
+  new Chart(ctx, { type:'bar',
+    data:{ labels: {{ snap.trend_labels|tojson }},
+      datasets:[{ data: vals, backgroundColor: colors, borderRadius:4 }] },
+    options:{ plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:c=>ugxTick(c.parsed.y) } } },
+      scales:{ x:{ ticks:{ maxTicksLimit:7 } }, y:{ ticks:{ callback:ugxTick } } } } });
+})();
+
+(function(){
+  const ctx = document.getElementById('snapChan');
+  if (!ctx) return;
+  new Chart(ctx, { type:'doughnut',
+    data:{ labels: {{ snap.chan_labels|tojson }},
+      datasets:[{ data: {{ snap.chan_values|tojson }}, backgroundColor:PALETTE }] },
+    options:{ plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10, font:{size:10} } },
+      tooltip:{ callbacks:{ label:c=>c.label+': '+ugxTick(c.parsed) } } } } });
+})();
+
+(function(){
+  const ctx = document.getElementById('snapCust');
+  if (!ctx) return;
+  new Chart(ctx, { type:'bar',
+    data:{ labels: {{ snap.cust_labels|tojson }},
+      datasets:[{ data: {{ snap.cust_values|tojson }}, backgroundColor:RF.olive }] },
+    options:{ indexAxis:'y', plugins:{ legend:{display:false},
+      tooltip:{ callbacks:{ label:c=>ugxTick(c.parsed.x) } } },
+      scales:{ x:{ ticks:{ callback:ugxTick, maxTicksLimit:4 } }, y:{ ticks:{ font:{size:10} } } } } });
+})();
+
+(function(){
+  const ctx = document.getElementById('snapFill');
+  if (!ctx) return;
+  new Chart(ctx, { type:'line',
+    data:{ labels: {{ snap.fill_labels|tojson }},
+      datasets:[{ label:'Fill rate %', data: {{ snap.fill_series|tojson }},
+        borderColor:RF.green, backgroundColor:'rgba(46,125,50,0.10)', fill:true,
+        tension:0.3, pointRadius:0, borderWidth:2, spanGaps:true }] },
+    options:{ plugins:{ legend:{display:false},
+        tooltip:{ callbacks:{ label:c=> (c.parsed.y==null?'no deliveries':c.parsed.y+'%') } } },
+      scales:{ x:{ ticks:{ maxTicksLimit:7, autoSkip:true } },
+        y:{ suggestedMin:0, suggestedMax:100, ticks:{ callback:v=>v+'%' } } } } });
+})();
+</script>
+{% endblock %}

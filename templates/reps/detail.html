@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block heading %}{{ rep.full_name }}{% endblock %}
+{% block content %}
+<a href="{{ url_for('reps.index') }}" class="small">&larr; All reps</a>
+
+<div class="row g-3 mt-1">
+  <div class="col-lg-4">
+    <div class="rf-card p-4">
+      <h2 class="h6">Rep details</h2>
+      <dl class="row mb-0 small">
+        <dt class="col-5">Name</dt><dd class="col-7">{{ rep.full_name }}</dd>
+        <dt class="col-5">Username</dt><dd class="col-7">{{ rep.username }}</dd>
+        <dt class="col-5">Role</dt><dd class="col-7 text-capitalize">{{ rep.role }}</dd>
+        <dt class="col-5">Edit right</dt><dd class="col-7">{{ 'Yes' if rep.may_edit_prices else 'No' }}</dd>
+        <dt class="col-5">Status</dt><dd class="col-7">{{ 'Active' if rep.is_active else 'Disabled' }}</dd>
+      </dl>
+      {% if current_user.is_admin %}
+      <a class="btn btn-sm btn-outline-secondary mt-3" href="{{ url_for('admin.user_edit', user_id=rep.id) }}"><i class="bi bi-gear"></i> Edit account / rights</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="rf-card p-4">
+      <div class="d-flex justify-content-between align-items-center">
+        <h2 class="h6 mb-0">Customers responsible for</h2>
+        <a class="small" href="{{ url_for('customers.new') }}"><i class="bi bi-plus-lg"></i> Add a new customer</a>
+      </div>
+      <p class="small text-muted">Tick the customers this rep should cover. They will see only these customers' pricelists and quotes.</p>
+      {% if customers %}
+      <div class="input-group input-group-sm mb-2" style="max-width:380px">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="text" class="form-control" id="repSearch" placeholder="Search customers…" autocomplete="off" onkeyup="repFilter()">
+        <button type="button" class="btn btn-outline-secondary" onclick="repShow('assigned')">Show assigned</button>
+        <button type="button" class="btn btn-outline-secondary" onclick="repShow('all')">Show all</button>
+      </div>
+      {% endif %}
+      <form method="post" action="{{ url_for('reps.assign', user_id=rep.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="row" id="repBox" style="max-height:420px; overflow:auto">
+          {% for c in customers %}
+          <div class="col-md-6 rep-row" data-name="{{ c.name|lower }}" data-assigned="{{ 1 if c.id in assigned_ids else 0 }}">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="customers" value="{{ c.id }}"
+                     id="c{{ c.id }}" {{ 'checked' if c.id in assigned_ids }}>
+              <label class="form-check-label" for="c{{ c.id }}">{{ c.name }}
+                <span class="text-muted small">({{ c.market }}, {{ c.default_currency }})</span></label>
+            </div>
+          </div>
+          {% else %}
+          <p class="text-muted">No customers exist yet. <a href="{{ url_for('customers.new') }}">Add one</a> first.</p>
+          {% endfor %}
+        </div>
+        {% if customers %}<button class="btn btn-primary mt-3">Save assignment</button>{% endif %}
+      </form>
+      <script>
+      var repMode='all';
+      function repApply(){
+        var q=(document.getElementById('repSearch').value||'').toLowerCase();
+        document.querySelectorAll('#repBox .rep-row').forEach(function(r){
+          var nameOk=!q||(r.getAttribute('data-name')||'').indexOf(q)>-1;
+          var modeOk=repMode==='all'||r.getAttribute('data-assigned')==='1';
+          r.style.display=(nameOk&&modeOk)?'':'none';
+        });
+      }
+      function repFilter(){ repApply(); }
+      function repShow(m){ repMode=m; repApply(); }
+      </script>
+    </div>
+  </div>
+</div>
+{% endblock %}

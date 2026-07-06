@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block heading %}{{ store.name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <a class="small" href="{{ url_for('stock.stores') }}">← All stores</a>
+    <h1 class="h5 rf-head mb-0">{{ store.name }} <span class="badge bg-secondary">{{ store.kind_label }}</span></h1>
+  </div>
+  <form method="get" class="input-group input-group-sm" style="max-width:280px">
+    <span class="input-group-text"><i class="bi bi-search"></i></span>
+    <input class="form-control" name="q" value="{{ q }}" placeholder="Search items…">
+  </form>
+</div>
+
+<div class="table-responsive rf-card">
+<table class="table table-sm table-hover align-middle mb-0">
+  <thead><tr><th>Item</th><th>Category</th><th>Pack</th><th>UoM</th><th>Origin</th><th class="text-end">Quantity</th>{% if can_manage %}<th>Update</th><th></th>{% endif %}</tr></thead>
+  <tbody>
+  {% for i in items %}
+    <tr>
+      <td class="fw-semibold">{{ i.name }}{% if i.is_low %} <span class="badge badge-warn">low</span>{% endif %}</td>
+      <td class="small">{{ i.category or '—' }}</td>
+      <td class="small">{{ i.pack_size or '' }}</td>
+      <td class="small">{{ i.uom or '' }}</td>
+      <td class="small">{{ i.origin or '' }}</td>
+      <td class="text-end">{{ '%g'|format(i.quantity or 0) }}</td>
+      {% if can_manage %}
+      <td>
+        <form method="post" action="{{ url_for('stock.store_item_qty', item_id=i.id) }}" class="d-flex gap-1">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input class="form-control form-control-sm text-end" name="quantity" type="number" step="any" value="{{ '%g'|format(i.quantity or 0) }}" style="width:90px">
+          <button class="btn btn-sm btn-outline-primary py-0 px-2">Set</button>
+        </form>
+      </td>
+      <td class="text-end"><form method="post" action="{{ url_for('stock.store_item_remove', item_id=i.id) }}" onsubmit="return confirm('Remove {{ i.name }}?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-link text-muted p-0"><i class="bi bi-trash"></i></button></form></td>
+      {% endif %}
+    </tr>
+  {% else %}<tr><td colspan="8" class="text-center text-muted py-4">No items{% if q %} match{% endif %} yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if can_manage %}
+<div class="rf-card p-3 mt-3" style="max-width:760px">
+  <h2 class="h6">Add an item</h2>
+  <form method="post" action="{{ url_for('stock.store_item_add', store_id=store.id) }}" class="row g-2">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="col-md-5"><input class="form-control form-control-sm" name="name" placeholder="Item name" required></div>
+    <div class="col-md-3"><input class="form-control form-control-sm" name="category" placeholder="Category"></div>
+    <div class="col-md-2"><input class="form-control form-control-sm" name="pack_size" placeholder="Pack"></div>
+    <div class="col-md-2"><input class="form-control form-control-sm" name="uom" placeholder="UoM"></div>
+    <div class="col-md-3"><input class="form-control form-control-sm" name="origin" placeholder="Origin"></div>
+    <div class="col-md-3"><input class="form-control form-control-sm" name="quantity" type="number" step="any" placeholder="Quantity"></div>
+    <div class="col-md-3"><input class="form-control form-control-sm" name="low_level" type="number" step="any" placeholder="Low-stock alert"></div>
+    <div class="col-md-3"><button class="btn btn-sm btn-primary w-100">Add item</button></div>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

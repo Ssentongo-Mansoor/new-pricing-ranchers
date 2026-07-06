@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block heading %}Reps{% endblock %}
+{% block content %}
+<p class="text-muted">Each sales rep and the customers they are responsible for. Open a rep to change which customers they cover.</p>
+
+<div class="table-responsive rf-card">
+<table class="table table-hover align-middle mb-0">
+  <thead><tr><th>Rep</th><th>Username</th><th>Edit right</th><th>Customers responsible for</th><th></th></tr></thead>
+  <tbody>
+  {% for r in reps %}
+    <tr>
+      <td class="fw-semibold"><a href="{{ url_for('reps.detail', user_id=r.id) }}">{{ r.full_name }}</a>
+        {% if not r.is_active %}<span class="badge bg-secondary">disabled</span>{% endif %}</td>
+      <td class="small">{{ r.username }}</td>
+      <td>{% if r.may_edit_prices %}<span class="badge" style="background:var(--rf-orange)">yes</span>{% else %}<span class="badge bg-secondary">no</span>{% endif %}</td>
+      <td class="small">
+        {% set n = r.assigned_customers|length %}
+        {% if n %}<a href="{{ url_for('reps.detail', user_id=r.id) }}">{{ n }} customer{{ '' if n == 1 else 's' }}</a>
+        {% else %}<span class="text-muted">none yet</span>{% endif %}
+      </td>
+      <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('reps.detail', user_id=r.id) }}"><i class="bi bi-pencil"></i> Manage</a></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5" class="text-center text-muted py-4">No reps yet. Create one under Admin → Users (set the role to “Rep”).</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if current_user.is_admin %}
+<p class="small text-muted mt-3"><i class="bi bi-info-circle"></i> To add a new rep, go to Admin → Users → New user and set the role to “Rep”. To add a customer, use the Customers tab.</p>
+{% endif %}
+{% endblock %}

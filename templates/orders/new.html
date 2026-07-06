@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block heading %}New order{% endblock %}
+{% block content %}
+<div class="rf-card p-4" style="max-width:720px">
+  <form method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <h2 class="h6">Customer &amp; pricing</h2>
+    <div class="row">
+      <div class="col-md-6 mb-3"><label class="form-label">Customer</label>
+        <input class="form-control form-control-sm mb-1" id="custSearch" placeholder="Type to search customer…" autocomplete="off">
+        <select class="form-select" name="customer_id" id="customerSel" required size="1">
+          <option value="">Choose…</option>
+          {% for c in customers %}<option value="{{ c.id }}" data-name="{{ c.name|lower }}">{{ c.name }}</option>{% endfor %}
+        </select>
+        {% if not customers %}<div class="form-text text-danger">You have no customers assigned. Ask a manager to assign you under the Reps tab.</div>{% endif %}
+      </div>
+      <div class="col-md-6 mb-3"><label class="form-label">Price from list</label>
+        <select class="form-select" name="source_id" id="sourceSel" required disabled>
+          <option value="">Choose a customer first…</option>
+          {% for p in lists %}<option value="{{ p.id }}" data-cust="" hidden>{{ p.name }} ({{ p.currency }}){{ ' · customer' if p.is_customer }}</option>{% endfor %}
+        </select>
+        <div class="form-text">Only the pricelists allocated to the chosen customer are shown.</div></div>
+    </div>
+    <div class="row">
+      <div class="col-md-4 mb-3"><label class="form-label">Currency</label>
+        <select class="form-select" name="currency"><option>UGX</option><option>USD</option></select></div>
+      <div class="col-md-4 mb-3"><label class="form-label">Market</label>
+        <select class="form-select" name="market">
+          <option value="local">Local (VAT 18%)</option>
+          <option value="export">Export (zero-rated)</option>
+        </select></div>
+      <div class="col-md-4 mb-3"><label class="form-label">Requested delivery date</label>
+        <input class="form-control" type="date" name="delivery_date"></div>
+    </div>
+
+    <h2 class="h6 mt-2">Order details</h2>
+    <div class="row">
+      <div class="col-md-6 mb-3"><label class="form-label">Customer PO / reference</label>
+        <input class="form-control" name="customer_po"></div>
+      <div class="col-md-6 mb-3"><label class="form-label">Payment terms</label>
+        <input class="form-control" value="Set on the customer record" disabled>
+        <div class="form-text">Inherited from the customer. Change it under Customers if needed.</div></div>
+    </div>
+    <div class="mb-3"><label class="form-label">Delivery address</label>
+      <textarea class="form-control" name="delivery_address" rows="2"></textarea></div>
+    <div class="mb-3"><label class="form-label">Notes</label>
+      <textarea class="form-control" name="notes" rows="2"></textarea></div>
+
+    <p class="small text-muted">For a USD order the UGX→USD rate in force is stamped onto the order so it stays fixed once placed.</p>
+    <button class="btn btn-primary">Start order</button>
+    <a class="btn btn-link" href="{{ url_for('orders.index') }}">Cancel</a>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const alloc = {{ alloc_map|tojson }};
+const custSel = document.getElementById('customerSel');
+const srcSel = document.getElementById('sourceSel');
+function filterLists(){
+  const cid = custSel.value;
+  const allowed = alloc[cid] || [];
+  let shown = 0;
+  Array.from(srcSel.options).forEach(function(o){
+    if(!o.value){ return; }
+    const ok = allowed.indexOf(parseInt(o.value)) !== -1;
+    o.hidden = !ok; o.disabled = !ok;
+    if(ok) shown++;
+  });
+  srcSel.value = "";
+  srcSel.disabled = !cid;
+  srcSel.options[0].textContent = cid ? (shown ? "Choose…" : "No pricelists allocated to this customer") : "Choose a customer first…";
+}
+custSel.addEventListener('change', filterLists);
+filterLists();
+
+// Type-to-search the customer list
+const custSearch = document.getElementById('custSearch');
+if(custSearch){
+  const opts = Array.prototype.slice.call(custSel.options).filter(function(o){ return o.value; });
+  custSearch.addEventListener('input', function(){
+    const q = custSearch.value.trim().toLowerCase();
+    let firstMatch = null;
+    opts.forEach(function(o){
+      const ok = !q || (o.getAttribute('data-name')||'').indexOf(q) !== -1;
+      o.hidden = !ok;
+      if(ok && !firstMatch) firstMatch = o;
+    });
+    // auto-select when exactly one matches
+    const matches = opts.filter(function(o){ return !o.hidden; });
+    if(q && matches.length === 1){ custSel.value = matches[0].value; filterLists(); }
+  });
+}
+</script>
+{% endblock %}

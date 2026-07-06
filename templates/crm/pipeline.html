@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block heading %}Pipeline{% endblock %}
+{% block content %}
+<p class="text-muted">Open deals by stage. Click a deal to open the customer and move it along.</p>
+<div class="d-flex gap-3" style="overflow-x:auto; padding-bottom:8px">
+  {% for s in stages %}
+  <div style="min-width:240px; flex:0 0 240px">
+    <div class="rf-card p-2 mb-2">
+      <div class="d-flex justify-content-between align-items-center">
+        <strong class="small">{{ s }}</strong>
+        <span class="badge bg-secondary">{{ by_stage[s]|length }}</span>
+      </div>
+      {% if totals[s] %}<div class="small text-rf-orange">{{ totals[s]|round(0)|int }}</div>{% endif %}
+    </div>
+    {% for d in by_stage[s] %}
+    <a class="rf-card p-2 mb-2 d-block text-decoration-none" href="{{ url_for('customers.detail', customer_id=d.customer_id) }}#deals">
+      <div class="fw-semibold small text-dark">{{ d.title }}</div>
+      <div class="small text-muted">{{ d.customer.name }}</div>
+      {% if d.value %}<div class="small money">{{ d.value|money(d.currency) }}</div>{% endif %}
+      {% if d.expected_close %}<div class="small text-muted">close {{ d.expected_close.strftime('%d %b') }}</div>{% endif %}
+    </a>
+    {% else %}<p class="small text-muted px-1">—</p>{% endfor %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

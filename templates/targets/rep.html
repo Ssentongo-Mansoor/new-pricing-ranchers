@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block heading %}Rep targets{% endblock %}
+{% macro ugx(v) %}UGX {{ '{:,.0f}'.format(v or 0) }}{% endmacro %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h5 mb-0">{{ rep.full_name }} — targets</h1>
+    <div class="text-muted small">{{ label }}</div>
+  </div>
+  <form method="get" class="d-flex gap-2">
+    <input type="month" class="form-control form-control-sm" name="ym" value="{{ ym }}" onchange="this.form.submit()">
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('targets.index', ym=ym) }}">All reps</a>
+  </form>
+</div>
+
+<form method="post" action="{{ url_for('targets.rep', rep_id=rep.id, ym=ym) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="ym" value="{{ ym }}">
+
+  <div class="rf-card p-3 mb-3" style="max-width:520px">
+    <label class="form-label fw-semibold">Monthly total target (UGX)</label>
+    <input class="form-control" name="total" inputmode="numeric"
+           value="{{ '%.0f'|format(tg.total) if tg.total else '' }}" placeholder="e.g. 50000000">
+    <div class="small text-muted mt-1">Month to date: <strong>{{ ugx(act.total) }}</strong>. Leave blank for no overall target.</div>
+  </div>
+
+  <div class="rf-card p-3 mb-3">
+    <h2 class="h6">Per-customer targets <span class="text-muted small fw-normal">(optional)</span></h2>
+    <table class="table table-sm align-middle mb-2">
+      <thead><tr><th>Customer</th><th style="width:200px">Target (UGX)</th><th class="text-end" style="width:160px">Month to date</th></tr></thead>
+      <tbody>
+      {% set crows = (tg.customer.keys()|list) + [0,0,0] %}
+      {% for cid in crows %}
+        <tr>
+          <td>
+            <select class="form-select form-select-sm" name="cust_id">
+              <option value="">— choose customer —</option>
+              {% for c in assigned %}<option value="{{ c.id }}" {{ 'selected' if c.id==cid }}>{{ c.name }}</option>{% endfor %}
+            </select>
+          </td>
+          <td><input class="form-control form-control-sm" name="cust_amt" inputmode="numeric"
+                     value="{{ '%.0f'|format(tg.customer[cid]) if cid in tg.customer else '' }}"></td>
+          <td class="text-end small">{{ ugx(act.by_customer.get(cid)) if cid in tg.customer else '' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div class="small text-muted">Set an amount to add a line; clear it to remove. Customers shown are this rep&#39;s assigned outlets.</div>
+  </div>
+
+  <div class="rf-card p-3 mb-3">
+    <h2 class="h6">Per-product targets <span class="text-muted small fw-normal">(optional)</span></h2>
+    <table class="table table-sm align-middle mb-2">
+      <thead><tr><th>Product</th><th style="width:200px">Target (UGX)</th><th class="text-end" style="width:160px">Month to date</th></tr></thead>
+      <tbody>
+      {% set prows = (tg.product.keys()|list) + [0,0,0] %}
+      {% for pid in prows %}
+        <tr>
+          <td>
+            <select class="form-select form-select-sm" name="prod_id">
+              <option value="">— choose product —</option>
+              {% for p in products %}<option value="{{ p.id }}" {{ 'selected' if p.id==pid }}>{{ p.article_no }} · {{ p.description }}</option>{% endfor %}
+            </select>
+          </td>
+          <td><input class="form-control form-control-sm" name="prod_amt" inputmode="numeric"
+                     value="{{ '%.0f'|format(tg.product[pid]) if pid in tg.product else '' }}"></td>
+          <td class="text-end small">{{ ugx(act.by_product.get(pid)) if pid in tg.product else '' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div class="small text-muted">Product month-to-date populates from live orders going forward.</div>
+  </div>
+
+  <button class="btn btn-primary">Save targets</button>
+</form>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block heading %}Settings · {{ pl.name }}{% endblock %}
+{% block content %}
+<div class="rf-card p-4" style="max-width:640px">
+  <form method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="mb-3"><label class="form-label">Name</label>
+      <input class="form-control" name="name" value="{{ pl.name }}"></div>
+    <div class="row">
+      <div class="col-md-6 mb-3"><label class="form-label">Effective date</label>
+        <input class="form-control" type="date" name="effective_date" value="{{ pl.effective_date }}"></div>
+      <div class="col-md-6 mb-3"><label class="form-label">Valid until</label>
+        <input class="form-control" type="date" name="valid_until" value="{{ pl.valid_until or '' }}"></div>
+    </div>
+    <div class="mb-3"><label class="form-label">Notes</label>
+      <textarea class="form-control" name="notes" rows="3">{{ pl.notes or '' }}</textarea></div>
+    <button class="btn btn-primary">Save</button>
+    <a class="btn btn-link" href="{{ url_for('customer_pricelists.detail', list_id=pl.id) }}">Back</a>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block heading %}Trial balance{% endblock %}
+{% block content %}
+<form class="row g-2 mb-3" method="get">
+  <div class="col-auto"><label class="col-form-label small">As of</label></div>
+  <div class="col-auto"><input class="form-control" type="date" name="as_of" value="{{ as_of }}"></div>
+  <div class="col-auto"><button class="btn btn-primary">Run</button></div>
+  {% if as_of %}<div class="col-auto"><a class="btn btn-link" href="{{ url_for('accounting.trial_balance') }}">Clear date</a></div>{% endif %}
+</form>
+
+<div class="table-responsive rf-card">
+<table class="table table-sm align-middle mb-0">
+  <thead><tr><th>Code</th><th>Account</th>
+    <th class="text-end">Debit (UGX)</th><th class="text-end">Credit (UGX)</th></tr></thead>
+  <tbody>
+  {% for a, dr, cr in rows %}
+    <tr>
+      <td class="fw-semibold">{{ a.code }}</td>
+      <td>{{ a.name }}</td>
+      <td class="text-end">{{ '{:,}'.format(dr) if dr else '' }}</td>
+      <td class="text-end">{{ '{:,}'.format(cr) if cr else '' }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="4" class="text-center text-muted py-4">No posted entries{% if as_of %} on or before {{ as_of }}{% endif %}.</td></tr>
+  {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr class="fw-semibold">
+      <td colspan="2" class="text-end">Totals</td>
+      <td class="text-end">{{ '{:,}'.format(total_dr) }}</td>
+      <td class="text-end">{{ '{:,}'.format(total_cr) }}</td>
+    </tr>
+    <tr>
+      <td colspan="4" class="text-end">
+        {% if total_dr == total_cr %}
+          <span class="badge badge-ok">Debits equal credits ✓</span>
+        {% else %}
+          <span class="badge badge-danger">OUT OF BALANCE by {{ '{:,}'.format((total_dr - total_cr)|abs) }} — investigate immediately</span>
+        {% endif %}
+      </td>
+    </tr>
+  </tfoot>
+</table>
+</div>
+{% endblock %}

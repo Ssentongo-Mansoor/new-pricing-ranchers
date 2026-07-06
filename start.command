@@ -1,0 +1,27 @@
+#!/bin/bash
+# Ranchers Finest — Pricing app launcher.
+# Double-click this file in Finder, or run it from Terminal.
+cd "$(dirname "$0")" || exit 1
+
+echo "Preparing the Ranchers Finest pricing app..."
+python3 -m pip install -q -r requirements.txt 2>/dev/null
+
+# First run: create the database, a default admin, and load the pricelists.
+if [ ! -s instance/pricing.db ]; then
+  echo "First run — setting up the database and loading pricelists..."
+  RF_ADMIN_USER=admin RF_ADMIN_PASS=ranchers2026 RF_ADMIN_NAME="Administrator" python3 setup.py
+  python3 importer.py
+  LOGIN_LINE="Login:  admin   /   ranchers2026   (change it under Admin once you are in)"
+else
+  LOGIN_LINE="Login:  use the username and password you set up earlier"
+fi
+
+echo ""
+echo "============================================================"
+echo "  Ranchers Finest Pricing is starting."
+echo "  Open this in your browser:   http://127.0.0.1:8000"
+echo "  $LOGIN_LINE"
+echo "  To stop the app: come back here and press  Control + C"
+echo "============================================================"
+echo ""
+python3 -m flask --app app run --port 8000

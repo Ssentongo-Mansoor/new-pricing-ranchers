@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block heading %}Set exchange rate{% endblock %}
+{% block content %}
+<div class="rf-card p-4" style="max-width:680px">
+  <form method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="row">
+      <div class="col-md-4 mb-3"><label class="form-label">Quote currency</label>
+        <select class="form-select" name="quote_ccy">
+          <option {{ 'selected' if form.get('quote_ccy')=='USD' }}>USD</option>
+          <option {{ 'selected' if form.get('quote_ccy')=='TZS' }}>TZS</option>
+        </select></div>
+      <div class="col-md-8 mb-3"><label class="form-label">Rate — UGX per 1 unit</label>
+        <input class="form-control" name="rate" value="{{ form.get('rate','') }}" type="number" step="0.0001" required></div>
+    </div>
+    <div class="row">
+      <div class="col-md-6 mb-3"><label class="form-label">Effective date</label>
+        <input class="form-control" type="date" name="effective_date" value="{{ form.get('effective_date','') }}"></div>
+      <div class="col-md-6 mb-3"><label class="form-label">Expiry date</label>
+        <input class="form-control" type="date" name="expiry_date" value="{{ form.get('expiry_date','') }}"></div>
+    </div>
+    <p class="small text-muted">Issued quotes keep the rate stamped on them; only future conversions use this rate. Preview the impact before committing.</p>
+    <button class="btn btn-outline-primary" name="commit" value="0">Preview impact</button>
+    {% if preview is not none %}<button class="btn btn-primary" name="commit" value="1">Commit rate</button>{% endif %}
+  </form>
+</div>
+
+{% if preview is not none %}
+<div class="rf-card p-4 mt-3">
+  <h2 class="h6">Impact preview</h2>
+  <p>
+    {% if preview.old_rate %}Old rate: <strong>UGX {{ '%.2f'|format(preview.old_rate) }}</strong> → {% endif %}
+    New rate: <strong>UGX {{ '%.2f'|format(preview.new_rate) }}</strong> / {{ preview.quote }}
+    {% if preview.pct is not none %}<span class="badge {{ 'badge-danger' if preview.pct>0 else 'badge-ok' }}">{{ '%+.1f'|format(preview.pct) }}%</span>{% endif %}
+  </p>
+  <ul class="small">
+    <li>{{ preview.usd_lists|length }} {{ preview.quote }}-denominated pricelist(s) affected for display/export.</li>
+    <li>{{ preview.n_ugx_lists }} UGX list(s) will convert differently when shown in {{ preview.quote }}.</li>
+    <li>{{ preview.draft_offers|length }} draft quote(s) in {{ preview.quote }} (issued quotes are unaffected — their rate is stamped).</li>
+  </ul>
+  {% if preview.draft_offers %}
+  <table class="table table-sm">
+    <thead><tr><th>Draft quote</th><th>Customer</th><th class="text-end">Current total</th></tr></thead>
+    <tbody>{% for o in preview.draft_offers %}<tr><td>{{ o.number }}</td><td>{{ o.customer.name }}</td><td class="text-end money">{{ o.total|money(o.currency) }}</td></tr>{% endfor %}</tbody>
+  </table>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

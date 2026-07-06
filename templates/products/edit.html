@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block heading %}Edit {{ product.article_no }}{% endblock %}
+{% block content %}
+<div class="rf-card p-4" style="max-width:640px">
+  <form method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="mb-3"><label class="form-label">Description</label>
+      <input class="form-control" name="description" value="{{ product.description }}"></div>
+    <div class="row">
+      <div class="col-md-6 mb-3"><label class="form-label">Barcode</label>
+        <input class="form-control" name="barcode" value="{{ product.barcode or '' }}"></div>
+      <div class="col-md-6 mb-3"><label class="form-label">Pack size</label>
+        <input class="form-control" name="pack_size" value="{{ product.pack_size or '' }}"></div>
+    </div>
+    <div class="row">
+      <div class="col-md-6 mb-3"><label class="form-label">Unit of measure</label>
+        <input class="form-control" name="unit_of_measure" value="{{ product.unit_of_measure or '' }}"></div>
+      <div class="col-md-6 mb-3"><label class="form-label">Category</label>
+        <select class="form-select" name="category_id">
+          <option value="">—</option>
+          {% for c in cats %}<option value="{{ c.id }}" {{ 'selected' if product.category_id==c.id }}>{{ c.full_name }}</option>{% endfor %}
+        </select></div>
+    </div>
+    <div class="form-check mb-3">
+      <input class="form-check-input" type="checkbox" name="vat_applicable" value="1" id="vat" {{ 'checked' if product.vat_applicable }}>
+      <label class="form-check-label" for="vat">Carries VAT (processed product). Leave unticked for VAT-exempt items.</label>
+    </div>
+    <div class="mb-3"><label class="form-label">Unit cost (UGX, per unit above)</label>
+      <input class="form-control" name="unit_cost" inputmode="decimal"
+             value="{{ '%g'|format(product.unit_cost|float) if product.unit_cost else '' }}" style="max-width:240px">
+      <div class="form-text">When set, prices below this cost are blocked everywhere. Leave blank for no cost floor.</div>
+    </div>
+    <div class="mb-3"><label class="form-label">Status</label>
+      <select class="form-select" name="status">
+        <option value="active" {{ 'selected' if product.is_active }}>Active</option>
+        <option value="inactive" {{ 'selected' if not product.is_active }}>Inactive</option>
+      </select></div>
+    <button class="btn btn-primary">Save</button>
+    <a class="btn btn-link" href="{{ url_for('products.detail', product_id=product.id) }}">Cancel</a>
+  </form>
+</div>
+{% endblock %}

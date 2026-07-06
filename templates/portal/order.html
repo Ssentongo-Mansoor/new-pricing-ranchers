@@ -1,0 +1,279 @@
+{% extends "portal/base.html" %}
+{% block content %}
+{% set editable = order.status == 'draft' %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h5 rf-head mb-1">Order {{ order.number }}</h1>
+    <div>
+      {% if order.status=='draft' %}<span class="badge bg-secondary">draft — not submitted</span>
+      {% elif order.status=='submitted' %}<span class="badge" style="background:#ED1C24">submitted — awaiting confirmation</span>
+      {% elif order.status=='placed' %}<span class="badge bg-dark">confirmed</span>
+      {% elif order.status=='in_fulfillment' %}<span class="badge" style="background:#F47A21">being prepared</span>
+      {% elif order.status=='ready_for_dispatch' %}<span class="badge" style="background:#6E7149">ready for dispatch</span>
+      {% elif order.status in ['out_for_delivery','dispatched'] %}<span class="badge" style="background:#2E7D32">dispatched — on the way</span>
+      {% elif order.status=='pending' %}<span class="badge badge-warn">pending stock</span>
+      {% elif order.status in ['delivered','fulfilled'] and order.has_outstanding %}<span class="badge badge-warn">partially delivered</span>
+      {% elif order.status in ['delivered','fulfilled'] %}<span class="badge badge-ok">delivered</span>
+      {% else %}<span class="badge bg-secondary">cancelled</span>{% endif %}
+      <span class="text-muted small ms-2">{{ order.source_pricelist.name }} · {{ order.currency }} · {{ 'VAT '~(order.vat_rate|int)~'%' if order.vat_applicable else 'zero-rated' }}</span>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    {% if order.status not in ['draft'] %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('portal.order_pdf', order_id=order.id, view=1) }}" target="_blank"><i class="bi bi-eye"></i> View</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('portal.order_pdf', order_id=order.id) }}"><i class="bi bi-download"></i> PDF</a>{% endif %}
+    {% if order.status in ['draft','submitted'] %}
+    <form method="post" action="{{ url_for('portal.cancel', order_id=order.id) }}" onsubmit="return confirm('Cancel this order?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i> Cancel</button></form>
+    {% endif %}
+  </div>
+</div>
+
+{% if editable %}
+<form method="post" action="{{ url_for('portal.save', order_id=order.id) }}" enctype="multipart/form-data" id="orderForm">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <p class="text-muted">Enter the quantity you want next to each product, then submit. Leave blank for items you don't need.</p>
+  <div class="input-group mb-2" style="max-width:420px">
+    <span class="input-group-text"><i class="bi bi-search"></i></span>
+    <input class="form-control" id="ordSearch" placeholder="Search product or article no…"
+           onkeyup="filterTable('ordSearch','orderTable')" autocomplete="off">
+  </div>
+  <div class="table-responsive rf-card mb-3">
+    <table class="table table-sm align-middle mb-0" id="orderTable">
+      <thead><tr><th>Art</th><th>Description</th><th>Pack</th><th class="text-end">Price</th><th class="text-end" style="width:110px">Quantity</th><th class="text-end">Line total</th></tr></thead>
+      <tbody>
+      {% set ns = namespace(section=None) %}
+      {% for r in rows %}
+        {% if r.line.section and r.line.section != ns.section %}
+          {% set ns.section = r.line.section %}
+          <tr class="section-row"><td colspan="6">{{ r.line.section }}</td></tr>
+        {% endif %}
+        <tr data-search="{{ (r.product.article_no ~ ' ' ~ r.product.description)|lower }}">
+          <td class="fw-semibold">{{ r.product.article_no }}</td>
+          <td>{{ r.product.description }}</td>
+          <td class="small">{{ r.line.pack_size or r.product.pack_size or '' }}</td>
+          <td class="text-end money">{{ r.price|money(order.currency) }}</td>
+          <td class="text-end">
+            <input type="number" step="any" min="0" name="qty_{{ r.line.id }}" value="{{ r.qty }}"
+                   class="form-control form-control-sm text-end qty" data-price="{{ r.price }}"
+                   data-vat="{{ 1 if (order.vat_applicable and r.product.vat_applicable) else 0 }}"
+                   style="width:95px; display:inline-block">
+          </td>
+          <td class="text-end money fw-semibold line-total">{% if r.qty %}{{ (r.price * r.qty)|money(order.currency) }}{% endif %}</td>
+        </tr>
+      {% else %}<tr><td colspan="6" class="text-center text-muted py-3">No items on this pricelist.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="rf-card p-3 mb-3" style="max-width:520px">
+    <div class="d-flex justify-content-between"><span>Subtotal</span><span class="money" id="liveSub">{{ order.subtotal|money(order.currency) }}</span></div>
+    <div class="d-flex justify-content-between"><span>{{ 'VAT '~(order.vat_rate|int)~'% (VAT items only)' if order.vat_applicable else 'VAT' }}</span><span class="money" id="liveVat">{{ order.vat_amount|money(order.currency) if order.vat_applicable else 'Zero-rated' }}</span></div>
+    <div class="d-flex justify-content-between fw-bold"><span>TOTAL</span><span class="money text-rf-orange" id="liveTot">{{ order.total|money(order.currency) }}</span></div>
+    <div class="small text-muted mt-1">Totals update when you save or submit.</div>
+  </div>
+
+  <div class="rf-card p-3 mb-3" style="max-width:640px">
+    <h2 class="h6">Delivery &amp; submission</h2>
+    <div class="row">
+      <div class="col-md-6 mb-2"><label class="form-label small">Requested delivery date</label>
+        <input class="form-control form-control-sm" type="date" name="delivery_date" value="{{ order.delivery_date or '' }}"></div>
+      <div class="col-md-6 mb-2"><label class="form-label small">Your PO / reference</label>
+        <input class="form-control form-control-sm" name="customer_po" value="{{ order.customer_po or '' }}"></div>
+    </div>
+    <div class="mb-2"><label class="form-label small">Delivery address</label>
+      <textarea class="form-control form-control-sm" name="delivery_address" rows="2">{{ order.delivery_address or order.customer.notes or '' }}</textarea></div>
+    <div class="mb-2"><label class="form-label small">Attach LPO (optional)</label>
+      <input class="form-control form-control-sm" type="file" name="lpo" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx"></div>
+    <div class="mb-2"><label class="form-label small">Notes</label>
+      <textarea class="form-control form-control-sm" name="notes" rows="2">{{ order.notes or '' }}</textarea></div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-secondary" name="action" value="save"><i class="bi bi-save"></i> Save for later</button>
+    <button class="btn btn-primary" name="action" value="submit"
+            onclick="return confirm('Submit this order to {{ company_name }}?')"><i class="bi bi-send"></i> Submit order</button>
+  </div>
+</form>
+
+{% else %}
+{% set show_del = order.status in ['delivered','fulfilled'] %}
+
+{% if order.status == 'cancelled' %}
+<div class="alert alert-secondary"><i class="bi bi-x-circle"></i> This order was cancelled.</div>
+{% else %}
+{% set steps = [('Submitted','bi-send'),('Confirmed','bi-check2'),('Being prepared','bi-box-seam'),('Dispatched','bi-truck'),('Delivered','bi-house-check')] %}
+{% set idx = {'submitted':1,'placed':2,'in_fulfillment':3,'pending':3,'ready_for_dispatch':3,'out_for_delivery':4,'dispatched':4,'delivered':5,'fulfilled':5}.get(order.status, 0) %}
+<div class="rf-card p-3 mb-3">
+  <div class="d-flex justify-content-between text-center" style="gap:4px">
+    {% for label, icon in steps %}
+      {% set n = loop.index %}
+      {% set done = n <= idx %}
+      <div style="flex:1; position:relative">
+        {% if not loop.first %}<div style="position:absolute; top:18px; left:-50%; width:100%; height:3px; background:{{ '#F47A21' if n <= idx else '#e7dccd' }}; z-index:0"></div>{% endif %}
+        <div style="position:relative; z-index:1; width:38px; height:38px; border-radius:50%; margin:0 auto;
+                    display:flex; align-items:center; justify-content:center;
+                    background:{{ '#F47A21' if done else '#fff' }}; color:{{ '#fff' if done else '#b9ab98' }};
+                    border:2px solid {{ '#F47A21' if done else '#e7dccd' }}">
+          <i class="bi {{ icon }}"></i>
+        </div>
+        <div class="small mt-1 {{ 'fw-semibold' if n==idx else 'text-muted' }}">{{ label }}</div>
+      </div>
+    {% endfor %}
+  </div>
+  {% if order.status=='pending' %}<div class="alert alert-warning py-2 mt-3 mb-0 small"><i class="bi bi-hourglass-split"></i> Some items are awaiting stock. We'll continue as soon as they arrive.</div>{% endif %}
+</div>
+{% endif %}
+
+{% if order.status in ['delivered','fulfilled'] %}
+<div class="rf-card p-3 mb-3" style="max-width:640px">
+  {% if order.rating %}
+    <h2 class="h6 mb-1"><i class="bi bi-star-fill text-rf-orange"></i> Thanks for your feedback</h2>
+    <div style="font-size:1.6rem; color:#F9A03F; letter-spacing:2px">
+      {% for n in range(1,6) %}{{ '★' if n <= order.rating else '☆' }}{% endfor %}
+    </div>
+    {% if order.rating_comment %}<p class="small text-muted mt-1 mb-0">“{{ order.rating_comment }}”</p>{% endif %}
+  {% else %}
+    <h2 class="h6 mb-2"><i class="bi bi-star text-rf-orange"></i> How was this delivery?</h2>
+    <form method="post" action="{{ url_for('portal.rate_order', order_id=order.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="star-rate mb-2">
+        {% for n in [5,4,3,2,1] %}
+        <input type="radio" id="star{{ n }}" name="rating" value="{{ n }}" required>
+        <label for="star{{ n }}" title="{{ n }} star{{ 's' if n>1 else '' }}">★</label>
+        {% endfor %}
+      </div>
+      <textarea class="form-control form-control-sm mb-2" name="comment" rows="2"
+                placeholder="Any comment on your order or delivery? (optional)"></textarea>
+      <button class="btn btn-sm btn-primary"><i class="bi bi-send"></i> Submit feedback</button>
+    </form>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if order.bo_confirm_state == 'proposed' %}
+<div class="alert alert-warning">
+  <i class="bi bi-arrow-repeat"></i> <strong>Back order awaiting your confirmation.</strong>
+  These items were out of stock on your earlier order. Confirm to have us deliver them when back in stock, or decline.
+  <div class="mt-2 d-flex gap-2">
+    <form method="post" action="{{ url_for('portal.backorder_decision', order_id=order.id, decision='confirm') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-sm btn-primary"><i class="bi bi-check2"></i> Confirm back order</button></form>
+    <form method="post" action="{{ url_for('portal.backorder_decision', order_id=order.id, decision='decline') }}" onsubmit="return confirm('Decline this back order?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x"></i> Decline</button></form>
+  </div>
+</div>
+{% elif order.bo_confirm_state == 'confirmed' and order.parent_order %}
+<div class="alert alert-secondary py-2"><i class="bi bi-check2-circle"></i> Back order confirmed.</div>
+{% endif %}
+{% set oos = order.lines|selectattr('availability','equalto','out_of_stock')|list %}
+{% if oos and order.status in ['in_fulfillment','pending','ready_for_dispatch','out_for_delivery','dispatched'] %}
+<div class="alert alert-warning">
+  <i class="bi bi-box-seam"></i> <strong>Some items are out of stock.</strong>
+  The rest of your order is being prepared for delivery now.
+  <ul class="mb-0 mt-2 small">
+    {% for l in oos %}
+    <li>{{ l.article_no }} — {{ l.description }}{% if l.expected_restock %} <span class="text-muted">(expected back {{ l.expected_restock.strftime('%d %b %Y') }})</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if order.status in ['delivered','fulfilled'] and order.has_outstanding %}
+<div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i>
+  Some items on this order could not be delivered in full.
+  {% if order.backorder %}The outstanding balance has been placed on back order
+  <a href="{{ url_for('portal.order', order_id=order.backorder.id) }}"><strong>{{ order.backorder.number }}</strong></a> and will follow.{% else %}We will be in touch about the balance.{% endif %}
+</div>
+{% endif %}
+{% if order.parent_order %}
+<div class="alert alert-secondary py-2"><i class="bi bi-arrow-return-right"></i>
+  This is a back order for the balance of
+  <a href="{{ url_for('portal.order', order_id=order.parent_order.id) }}">{{ order.parent_order.number }}</a>.</div>
+{% endif %}
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="rf-card p-0">
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Art</th><th>Description</th><th>Pack</th>
+          {% if show_del %}<th class="text-end">Ordered</th><th class="text-end">Delivered</th>{% else %}<th class="text-end">Qty</th>{% endif %}
+          <th class="text-end">Unit</th><th class="text-end">Total</th></tr></thead>
+        <tbody>
+        {% for l in order.lines %}
+          <tr><td>{{ l.article_no }}</td>
+            <td>{{ l.description }}{% if show_del and l.delivered_qty < l.quantity %} <span class="badge {{ 'badge-danger' if l.delivered_qty==0 else 'badge-warn' }}">{{ 'not delivered' if l.delivered_qty==0 else 'short' }}</span>{% elif not show_del and l.availability=='out_of_stock' %} <span class="badge badge-warn">out of stock{% if l.expected_restock %} · back {{ l.expected_restock.strftime('%d %b') }}{% endif %}</span>{% endif %}</td>
+            <td class="small">{{ l.pack_size }}</td>
+            {% if show_del %}
+              <td class="text-end">{{ l.quantity }}</td>
+              <td class="text-end {{ 'text-danger fw-semibold' if l.delivered_qty < l.quantity }}">{{ l.delivered_qty }}</td>
+            {% else %}<td class="text-end">{{ l.quantity }}</td>{% endif %}
+            <td class="text-end money">{{ l.unit_price|money(order.currency) }}</td>
+            <td class="text-end money fw-semibold">{{ l.line_total|money(order.currency) }}</td></tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+          {% set cs = 5 if show_del else 4 %}
+          <tr><td colspan="{{ cs }}"></td><td class="text-end">Subtotal{% if show_del %} (delivered){% endif %}</td><td class="text-end money">{{ order.subtotal|money(order.currency) }}</td></tr>
+          <tr><td colspan="{{ cs }}"></td><td class="text-end">{{ 'VAT '~(order.vat_rate|int)~'%' if order.vat_applicable else 'VAT' }}</td><td class="text-end money">{{ order.vat_amount|money(order.currency) if order.vat_applicable else 'Zero-rated' }}</td></tr>
+          <tr class="fw-bold"><td colspan="{{ cs }}"></td><td class="text-end">TOTAL</td><td class="text-end money text-rf-orange">{{ order.total|money(order.currency) }}</td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="rf-card p-3">
+      <h2 class="h6">Order details</h2>
+      <dl class="row small mb-0">
+        <dt class="col-5">Submitted</dt><dd class="col-7">{{ order.submitted_at.strftime('%d %b %Y') if order.submitted_at else '—' }}</dd>
+        <dt class="col-5">Delivery</dt><dd class="col-7">{{ order.delivery_date or '—' }}</dd>
+        <dt class="col-5">Your PO</dt><dd class="col-7">{{ order.customer_po or '—' }}</dd>
+        <dt class="col-5">LPO</dt><dd class="col-7">{% if order.lpo_filename %}<a href="{{ url_for('portal.lpo', order_id=order.id) }}">download</a>{% else %}—{% endif %}</dd>
+      </dl>
+      {% if order.notes %}<p class="small text-muted mt-2 mb-0">{{ order.notes }}</p>{% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+<style>
+.star-rate{ display:inline-flex; flex-direction:row-reverse; }
+.star-rate input{ display:none; }
+.star-rate label{ font-size:2rem; line-height:1; color:#dcd3c4; cursor:pointer; padding:0 2px; }
+.star-rate input:checked ~ label,
+.star-rate label:hover,
+.star-rate label:hover ~ label{ color:#F9A03F; }
+</style>
+{% endblock %}
+{% block scripts %}
+{% if order.status == 'draft' %}
+<script>
+const vatRate = {{ order.vat_rate if order.vat_applicable else 0 }};
+const cur = "{{ order.currency }}";
+function fmt(n){ return cur + " " + n.toLocaleString(undefined,{maximumFractionDigits: cur=='USD'?2:0}); }
+function recalc(){
+  let sub = 0, vatBase = 0;
+  document.querySelectorAll('.qty').forEach(function(i){
+    const q = parseFloat(i.value)||0; const p = parseFloat(i.dataset.price)||0;
+    const lt = q*p; sub += lt;
+    if(i.dataset.vat === '1') vatBase += lt;
+    const cell = i.closest('tr').querySelector('.line-total');
+    if(cell) cell.textContent = q>0 ? fmt(lt) : '';
+  });
+  const vat = vatBase * vatRate/100;
+  document.getElementById('liveSub').textContent = fmt(sub);
+  document.getElementById('liveVat').textContent = vatRate? fmt(vat) : 'Zero-rated';
+  document.getElementById('liveTot').textContent = fmt(sub+vat);
+}
+document.querySelectorAll('.qty').forEach(i=>i.addEventListener('input', recalc));
+recalc();
+function filterTable(inputId, tableId){
+  var term=(document.getElementById(inputId).value||'').toLowerCase();
+  document.querySelectorAll('#'+tableId+' tbody tr').forEach(function(tr){
+    if(tr.classList.contains('section-row')){ tr.style.display = term ? 'none' : ''; return; }
+    var s=tr.getAttribute('data-search')||'';
+    tr.style.display = (!term || s.indexOf(term)>-1) ? '' : 'none';
+  });
+}
+</script>
+{% endif %}
+{% endblock %}

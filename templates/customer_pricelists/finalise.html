@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block heading %}Finalise pricelist{% endblock %}
+{% block content %}
+<form method="post" action="{{ url_for('customer_pricelists.new') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="action" value="create">
+  <input type="hidden" name="customer_id" value="{{ customer.id }}">
+  <input type="hidden" name="base_id" value="{{ base.id }}">
+  <input type="hidden" name="valid_until" value="{{ valid_until_raw }}">
+  <input type="hidden" name="notes" value="{{ notes }}">
+
+  <div class="rf-card p-3 mb-3">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-6"><label class="form-label">Pricelist name</label>
+        <input class="form-control" name="name" value="{{ name }}"></div>
+      <div class="col-md-6 text-md-end small text-muted">
+        For <strong>{{ customer.name }}</strong> · based on <strong>{{ base.name }}</strong> · {{ base.currency }}
+        {% if base.vat_applicable %}· VAT {{ base.vat_rate|int }}%{% else %}· zero-rated{% endif %}
+      </div>
+    </div>
+    <hr>
+    <div class="d-flex flex-wrap align-items-end gap-2">
+      <div>
+        <label class="form-label small mb-1">Adjust all prices by</label>
+        <div class="input-group input-group-sm" style="width:220px">
+          <input type="number" step="any" class="form-control" id="adjPct" placeholder="e.g. -5 or 10">
+          <span class="input-group-text">%</span>
+          <button type="button" class="btn btn-outline-secondary" onclick="applyPct()">Apply</button>
+        </div>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="resetPrices()"><i class="bi bi-arrow-counterclockwise"></i> Reset to base</button>
+      <div class="input-group input-group-sm ms-auto" style="max-width:260px">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input class="form-control" id="fSearch" placeholder="Filter products…" onkeyup="filterRows()">
+      </div>
+    </div>
+    <div class="form-text">Edit any price directly. The percentage tool changes every price at once; you can still tweak individual lines after.</div>
+  </div>
+
+  <div class="rf-card p-0 mb-3">
+    <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0" id="grid">
+      <thead><tr><th>Art</th><th>Description</th><th>Pack</th>
+        {% for t in base.tiers %}<th class="text-end">{{ t.label }} ({{ base.currency }})</th>{% endfor %}</tr></thead>
+      <tbody>
+      {% set ns = namespace(section=None) %}
+      {% for line in base.lines %}
+        {% if line.section and line.section != ns.section %}
+          {% set ns.section = line.section %}
+          <tr class="section-row"><td colspan="{{ 3 + base.tiers|length }}">{{ line.section }}</td></tr>
+        {% endif %}
+        <tr data-search="{{ (line.product.article_no ~ ' ' ~ line.product.description)|lower }}">
+          <td class="small fw-semibold">{{ line.product.article_no }}</td>
+          <td class="small">{{ line.product.description }}</td>
+          <td class="small">{{ line.pack_size or line.product.pack_size or '' }}</td>
+          {% for t in base.tiers %}
+            {% set base_amt = line.price_for(t.key) %}
+            <td class="text-end">
+              <input type="number" step="any" min="0" class="form-control form-control-sm text-end priceInp"
+                     name="price_{{ line.id }}_{{ t.key }}"
+                     value="{{ '%.2f'|format(base_amt) if base_amt is not none else '' }}"
+                     data-base="{{ base_amt if base_amt is not none else '' }}"
+                     style="width:120px; display:inline-block">
+            </td>
+          {% endfor %}
+        </tr>
+      {% else %}<tr><td colspan="{{ 3 + base.tiers|length }}" class="text-center text-muted py-3">The base list has no lines.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2 mb-4">
+    <button class="btn btn-primary"><i class="bi bi-check2-circle"></i> Create pricelist</button>
+    <a class="btn btn-link" href="{{ url_for('customer_pricelists.new') }}">← Back</a>
+  </div>
+</form>
+<script>
+function applyPct(){
+  var pct = parseFloat(document.getElementById('adjPct').value);
+  if(isNaN(pct)) return;
+  document.querySelectorAll('.priceInp').forEach(function(i){
+    var b = parseFloat(i.dataset.base);
+    if(!isNaN(b)){ i.value = (b * (1 + pct/100)).toFixed(2); }
+  });
+}
+function resetPrices(){
+  document.querySelectorAll('.priceInp').forEach(function(i){
+    i.value = i.dataset.base !== '' ? parseFloat(i.dataset.base).toFixed(2) : '';
+  });
+}
+function filterRows(){
+  var q=(document.getElementById('fSearch').value||'').toLowerCase();
+  document.querySelectorAll('#grid tbody tr').forEach(function(tr){
+    if(tr.classList.contains('section-row')){ tr.style.display = q ? 'none' : ''; return; }
+    var s=tr.getAttribute('data-search')||'';
+    tr.style.display = (!q || s.indexOf(q)>-1) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

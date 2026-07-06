@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block heading %}My desk{% endblock %}
+{% macro ugx(v) %}UGX {{ '{:,.0f}'.format(v or 0) }}{% endmacro %}
+{% macro delta(p) %}
+  {% if p is none %}<span class="text-muted small">no prior data</span>
+  {% elif p >= 0 %}<span class="small fw-semibold" style="color:#2E7D32">▲ {{ '%.0f'|format(p) }}% vs last month</span>
+  {% else %}<span class="small fw-semibold" style="color:#ED1C24">▼ {{ '%.0f'|format(-p) }}% vs last month</span>{% endif %}
+{% endmacro %}
+{% macro ordstatus(s) %}
+  {% if s=='submitted' %}<span class="badge" style="background:#ED1C24">submitted</span>
+  {% elif s=='placed' %}<span class="badge bg-dark">placed</span>
+  {% elif s=='in_fulfillment' %}<span class="badge" style="background:#F47A21">in fulfilment</span>
+  {% elif s=='pending' %}<span class="badge badge-warn">pending stock</span>
+  {% elif s in ['ready_for_dispatch'] %}<span class="badge" style="background:#6E7149">ready</span>
+  {% elif s in ['out_for_delivery','dispatched'] %}<span class="badge" style="background:#2E7D32">out for delivery</span>
+  {% else %}<span class="badge bg-secondary">{{ s }}</span>{% endif %}
+{% endmacro %}
+{% block content %}
+
+<div class="rf-hero">
+  <img class="rf-hero-logo" src="{{ url_for('static', filename='img/ranchers-logo.svg') }}" alt="">
+  {% set hr = now.hour %}
+  <h1>{{ 'Good morning' if hr < 12 else 'Good afternoon' if hr < 17 else 'Good evening' }}, {{ current_user.full_name.split(' ')[0] }}</h1>
+  <div class="sub">{{ today.strftime('%A %d %B %Y') }} · your performance and what to push</div>
+</div>
+
+{% if fu_overdue or at_risk %}
+<div class="d-flex flex-column gap-2 mb-3">
+  {% if fu_overdue %}
+  <a class="text-decoration-none" href="{{ url_for('crm.follow_ups') }}">
+    <div class="alert alert-danger d-flex align-items-center gap-2 mb-0 py-2"><i class="bi bi-flag-fill fs-5"></i>
+      <span><strong>{{ fu_overdue|length }}</strong> follow-up(s) overdue.</span></div></a>
+  {% endif %}
+  {% if at_risk %}
+  <div class="alert alert-warning d-flex align-items-center gap-2 mb-0 py-2"><i class="bi bi-emoji-frown fs-5"></i>
+    <span><strong>{{ at_risk|length }}</strong> of your customers have gone quiet (no order in 60 days) — worth a call.</span></div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- performance tiles -->
+<div class="row g-3 mb-1">
+  <div class="col-md-4"><div class="rf-card p-3 h-100">
+    <div class="text-muted small text-uppercase">My sales — month to date</div>
+    <div class="h3 mb-1" style="color:#F47A21">{{ ugx(mtd) }}</div>
+    <div class="small text-muted mb-1">{{ mtd_label }}</div>{{ delta(delta_mtd) }}</div></div>
+  <div class="col-md-4"><div class="rf-card p-3 h-100">
+    <div class="text-muted small text-uppercase">Quote conversion</div>
+    <div class="h3 mb-1" style="color:#6E7149">{% if conv_rate is none %}—{% else %}{{ '%.0f'|format(conv_rate) }}%{% endif %}</div>
+    <div class="small text-muted">{{ won }} of {{ decided }} decided quotes won</div></div></div>
+  <div class="col-md-4"><div class="rf-card p-3 h-100">
+    <div class="text-muted small text-uppercase">Today</div>
+    <div class="small mt-1">{{ fu_today|length }} follow-up(s) due today</div>
+    <div class="small">{{ my_offers|length }} open quote(s)</div>
+    <div class="small">{{ queue|length }} active order(s)</div></div></div>
+</div>
+
+<div class="rf-kpis mb-3" style="grid-template-columns:repeat(4,1fr)">
+  <a href="{{ url_for('customers.index') }}"><div class="rf-kpi"><div class="num">{{ n_customers }}</div><div class="lbl">My customers</div></div></a>
+  <a href="{{ url_for('orders.index') }}"><div class="rf-kpi"><div class="num" style="color:#6E7149">{{ queue|length }}</div><div class="lbl">Active orders</div></div></a>
+  <a href="{{ url_for('offers.index') }}"><div class="rf-kpi"><div class="num" style="color:#F47A21">{{ my_offers|length }}</div><div class="lbl">Open quotes</div></div></a>
+  <a href="{{ url_for('crm.follow_ups') }}"><div class="rf-kpi"><div class="num" style="color:#ED1C24">{{ fu_overdue|length }}</div><div class="lbl">Overdue follow-ups</div></div></a>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-8"><div class="rf-card p-3 h-100">
+    <h2 class="h6"><i class="bi bi-bullseye text-rf-orange"></i> My target — {{ mtd_label }} <span class="text-muted small fw-normal">(month to date vs target)</span></h2>
+    {% if target_total %}
+      {% set p = (target_pct or 0)|round|int %}
+      <div class="d-flex justify-content-between small mb-1">
+        <span class="fw-semibold">{{ ugx(target_actual) }} <span class="text-muted">of</span> {{ ugx(target_total) }}</span>
+        <span class="fw-semibold" style="color:{{ '#2E7D32' if p>=100 else ('#F47A21' if p>=60 else '#ED1C24') }}">{{ p }}%</span>
+      </div>
+      <div class="progress mb-1" style="height:22px">
+        <div class="progress-bar {{ 'bg-success' if p>=100 else ('bg-warning text-dark' if p>=60 else 'bg-danger') }}"
+             style="width:{{ 100 if p>100 else p }}%">{{ p }}%</div>
+      </div>
+      <div class="small text-muted">{{ ugx((target_total - target_actual) if target_total > target_actual else 0) }} to go.</div>
+    {% else %}
+      <div class="text-muted small py-3"><i class="bi bi-info-circle"></i> No target set for this month. Your Sales Manager sets monthly targets.</div>
+    {% endif %}
+
+    {% if cust_targets %}
+    <h3 class="h6 mt-3 mb-1">By customer</h3>
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Customer</th><th class="text-end">MTD</th><th class="text-end">Target</th><th style="width:130px">%</th></tr></thead>
+      <tbody>
+      {% for r in cust_targets %}{% set p = (r.pct or 0)|round|int %}
+        <tr><td class="small fw-semibold">{{ r.name }}</td>
+          <td class="text-end small">{{ ugx(r.actual) }}</td>
+          <td class="text-end small">{{ ugx(r.target) }}</td>
+          <td><div class="progress" style="height:14px"><div class="progress-bar {{ 'bg-success' if p>=100 else ('bg-warning text-dark' if p>=60 else 'bg-danger') }}" style="width:{{ 100 if p>100 else p }}%">{{ p }}%</div></div></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {% if prod_targets %}
+    <h3 class="h6 mt-3 mb-1">By product</h3>
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Product</th><th class="text-end">MTD</th><th class="text-end">Target</th><th style="width:130px">%</th></tr></thead>
+      <tbody>
+      {% for r in prod_targets %}{% set p = (r.pct or 0)|round|int %}
+        <tr><td class="small fw-semibold">{{ r.name }}</td>
+          <td class="text-end small">{{ ugx(r.actual) }}</td>
+          <td class="text-end small">{{ ugx(r.target) }}</td>
+          <td><div class="progress" style="height:14px"><div class="progress-bar {{ 'bg-success' if p>=100 else ('bg-warning text-dark' if p>=60 else 'bg-danger') }}" style="width:{{ 100 if p>100 else p }}%">{{ p }}%</div></div></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div></div>
+  <div class="col-lg-4"><div class="rf-card p-3 h-100">
+    <h2 class="h6"><i class="bi bi-star text-rf-orange"></i> My top customers <span class="text-muted small fw-normal">(90 days)</span></h2>
+    <table class="table table-sm align-middle mb-0"><tbody>
+    {% for name, val in top_customers %}
+      <tr><td class="fw-semibold small">{{ loop.index }}. {{ name }}</td><td class="text-end money">{{ ugx(val) }}</td></tr>
+    {% else %}<tr><td class="text-muted small">No sales yet.</td></tr>{% endfor %}
+    </tbody></table></div></div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-12"><div class="rf-card p-3">
+    <h2 class="h6"><i class="bi bi-graph-up-arrow text-rf-orange"></i> My sales <span class="text-muted small fw-normal">(last 12 months · latest bar = month to date)</span></h2>
+    <canvas id="repTrend" height="90"></canvas></div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7"><div class="rf-card p-3 h-100">
+    <h2 class="h6 d-flex justify-content-between"><span><i class="bi bi-cart-check text-rf-orange"></i> Active orders to push</span>
+      <a class="small" href="{{ url_for('orders.index') }}">All</a></h2>
+    <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Order</th><th>Customer</th><th>Status</th><th class="text-end">Total</th></tr></thead>
+      <tbody>
+      {% for o in queue[:12] %}
+        <tr {% if order_delay(o)[0] %}class="table-danger"{% endif %}>
+          <td><a href="{{ url_for('orders.detail', order_id=o.id) }}">{{ o.number }}</a></td>
+          <td class="small">{{ o.customer.name }}</td>
+          <td>{{ ordstatus(o.status) }}</td>
+          <td class="text-end money">{{ o.total|money(o.currency) }}</td></tr>
+      {% else %}<tr><td colspan="4" class="text-center text-muted py-3">No active orders.</td></tr>{% endfor %}
+      </tbody>
+    </table></div></div></div>
+  <div class="col-lg-5"><div class="rf-card p-3 h-100">
+    <h2 class="h6 text-danger"><i class="bi bi-emoji-frown"></i> Win these back <span class="text-muted small fw-normal">(quiet 60+ days)</span></h2>
+    <ul class="list-group list-group-flush">
+      {% for r in at_risk %}
+      <li class="list-group-item px-0 d-flex justify-content-between">
+        <a href="{{ url_for('customers.detail', customer_id=r.customer.id) }}">{{ r.customer.name }}</a>
+        <span class="small text-muted">last {{ r.last.strftime('%d %b') }}</span></li>
+      {% else %}<li class="list-group-item px-0 text-muted small">No quiet customers — nice.</li>{% endfor %}
+    </ul></div></div>
+</div>
+
+<!-- Customer feedback (my customers) -->
+<div class="row g-3 mt-0">
+  <div class="col-lg-4"><div class="rf-card p-3 h-100 text-center">
+    <div class="text-muted small text-uppercase">My customers' rating (90d)</div>
+    <div class="h2 mb-0" style="color:#F9A03F">{% if avg_rating is none %}—{% else %}{{ avg_rating }} <span style="font-size:1rem">/ 5</span>{% endif %}</div>
+    <div style="color:#F9A03F; font-size:1.2rem; letter-spacing:2px">
+      {% if avg_rating %}{% for n in range(1,6) %}{{ '★' if n <= (avg_rating|round(0,'common')|int) else '☆' }}{% endfor %}{% endif %}</div>
+    <div class="small text-muted mt-1">{{ n_rated }} rated{% if low_fb %} · <span class="text-danger">{{ low_fb|length }} poor</span>{% endif %}</div>
+  </div></div>
+  <div class="col-lg-8"><div class="rf-card p-3 h-100">
+    <h2 class="h6"><i class="bi bi-chat-quote text-rf-orange"></i> Recent feedback from my customers</h2>
+    <ul class="list-group list-group-flush mb-0">
+      {% for o in fb_comments %}
+      <li class="list-group-item px-0 py-2">
+        <span style="color:#F9A03F">{% for n in range(1,6) %}{{ '★' if n <= o.rating else '☆' }}{% endfor %}</span>
+        <span class="small text-muted">· {{ o.customer.name }} · <a href="{{ url_for('orders.detail', order_id=o.id) }}">{{ o.number }}</a></span>
+        <div class="small">“{{ o.rating_comment }}”</div>
+      </li>
+      {% else %}<li class="list-group-item px-0 text-muted small">No written feedback yet.</li>{% endfor %}
+    </ul>
+  </div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script>
+const ugxTick = v => 'UGX ' + Number(v).toLocaleString();
+(function(){
+  const ctx=document.getElementById('repTrend'); if(!ctx) return;
+  const labels={{ trend_labels|tojson }}, vals={{ trend_values|tojson }};
+  const colors=labels.map((_,i)=> i===labels.length-1 ? '#F47A21' : 'rgba(110,113,73,0.55)');
+  new Chart(ctx,{type:'bar',data:{labels:labels,
+    datasets:[{data:vals,backgroundColor:colors,borderRadius:4}]},
+    options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>ugxTick(c.parsed.y)}}},
+      scales:{x:{ticks:{maxTicksLimit:12,autoSkip:false}},y:{ticks:{callback:ugxTick}}}}});
+})();
+</script>
+{% endblock %}

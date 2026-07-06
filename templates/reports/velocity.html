@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block heading %}Product velocity{% endblock %}
+{% block content %}
+{% include "reports/_nav.html" %}
+<form class="row g-2 align-items-end mb-3" method="get">
+  <div class="col-auto"><label class="form-label small mb-0">Window (days)</label>
+    <input class="form-control form-control-sm" type="number" name="days" value="{{ days }}"></div>
+  <div class="col-auto"><button class="btn btn-sm btn-primary">Run</button></div>
+  <div class="col-auto"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('reports.velocity', **{'days':days,'export':'csv'}) }}"><i class="bi bi-download"></i> CSV</a></div>
+</form>
+
+<div class="row g-3">
+  <div class="col-lg-7"><div class="rf-card p-3 h-100">
+    <h2 class="h6"><i class="bi bi-lightning-charge text-rf-orange"></i> Fastest movers</h2>
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Article</th><th>Description</th><th class="text-end">Units</th><th class="text-end">/week</th><th class="text-end">vs prev</th><th class="text-end">Short</th></tr></thead>
+      <tbody>
+      {% for e in movers %}
+        <tr><td class="fw-semibold">{{ e.article }}</td><td>{{ e.desc }}</td>
+          <td class="text-end">{{ '%g'|format(e.recent) }}</td>
+          <td class="text-end">{{ '%.1f'|format(e.per_week) }}</td>
+          <td class="text-end">{% if e.change>0 %}<span class="text-success">+{{ '%.0f'|format(e.change) }}%</span>{% elif e.change<0 %}<span class="text-danger">{{ '%.0f'|format(e.change) }}%</span>{% else %}—{% endif %}</td>
+          <td class="text-end">{% if e.short %}<span class="badge badge-warn">{{ e.short }}</span>{% endif %}</td></tr>
+      {% else %}<tr><td colspan="6" class="text-muted text-center py-3">No sales in this window.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+  <div class="col-lg-5"><div class="rf-card p-3 h-100">
+    <h2 class="h6"><i class="bi bi-graph-down text-rf-orange"></i> Declining products</h2>
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Article</th><th class="text-end">Units</th><th class="text-end">vs prev</th></tr></thead>
+      <tbody>
+      {% for e in decliners %}
+        <tr><td><span class="fw-semibold">{{ e.article }}</span><div class="small text-muted">{{ e.desc }}</div></td>
+          <td class="text-end">{{ '%g'|format(e.recent) }}</td>
+          <td class="text-end text-danger">{{ '%.0f'|format(e.change) }}%</td></tr>
+      {% else %}<tr><td colspan="3" class="text-muted text-center py-3">Nothing declining.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+</div>
+{% endblock %}

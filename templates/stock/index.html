@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block heading %}Stock{% endblock %}
+{% macro lvl(p) %}
+  {% if p.is_out_of_stock %}<span class="badge badge-danger">{{ '%g'|format(p.stock_on_hand or 0) }}</span>
+  {% elif p.is_low_stock %}<span class="badge badge-warn">{{ '%g'|format(p.stock_on_hand or 0) }}</span>
+  {% else %}<span class="badge badge-ok">{{ '%g'|format(p.stock_on_hand or 0) }}</span>{% endif %}
+  <span class="small text-muted">{{ p.unit_of_measure or '' }}</span>
+{% endmacro %}
+{% block content %}
+<div class="rf-kpis" style="grid-template-columns:repeat(3,1fr)">
+  <a href="{{ url_for('stock.index') }}"><div class="rf-kpi"><div class="num">{{ products|length }}</div><div class="lbl">Products shown</div></div></a>
+  <a href="{{ url_for('stock.index', view='low') }}"><div class="rf-kpi"><div class="num" style="color:#F9A03F">{{ n_low }}</div><div class="lbl">Low stock</div></div></a>
+  <a href="{{ url_for('stock.index', view='out') }}"><div class="rf-kpi"><div class="num" style="color:#B5341F">{{ n_out }}</div><div class="lbl">Out of stock</div></div></a>
+</div>
+
+<form class="row g-2 mb-3" method="get">
+  <div class="col-md-4"><input class="form-control" name="q" value="{{ q }}" placeholder="Search article no or description"></div>
+  <div class="col-md-3"><select class="form-select" name="category">
+    <option value="">All categories</option>
+    {% for c in categories %}<option value="{{ c }}" {{ 'selected' if c==cat }}>{{ c }}</option>{% endfor %}
+  </select></div>
+  <div class="col-md-3"><select class="form-select" name="view">
+    <option value="" {{ 'selected' if not view }}>All</option>
+    <option value="low" {{ 'selected' if view=='low' }}>Low stock</option>
+    <option value="out" {{ 'selected' if view=='out' }}>Out of stock</option>
+  </select></div>
+  <div class="col-md-2"><button class="btn btn-primary w-100">Filter</button></div>
+</form>
+
+<div class="table-responsive rf-card">
+<table class="table table-sm table-hover align-middle mb-0">
+  <thead><tr><th>Art No</th><th>Description</th><th>Category</th><th class="text-end">On hand</th><th>Alert at</th>{% if can_manage %}<th>Adjust stock</th>{% endif %}<th></th></tr></thead>
+  <tbody>
+  {% for p in products %}
+    <tr>
+      <td class="fw-semibold">{{ p.article_no }}</td>
+      <td>{{ p.description }}{% if p.vat_applicable %} <span class="badge bg-secondary">VAT</span>{% endif %}</td>
+      <td class="small">{{ p.category.full_name if p.category else '—' }}</td>
+      <td class="text-end">{{ lvl(p) }}</td>
+      <td class="small">
+        {% if can_manage %}
+        <form method="post" action="{{ url_for('stock.set_reorder', product_id=p.id) }}" class="d-flex gap-1">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input class="form-control form-control-sm text-end" name="low_stock_level" value="{{ '%g'|format(p.low_stock_level or 0) }}" style="width:70px">
+          <button class="btn btn-sm btn-outline-secondary py-0 px-1" title="Save alert level"><i class="bi bi-bell"></i></button>
+        </form>
+        {% else %}{{ '%g'|format(p.low_stock_level or 0) }}{% endif %}
+      </td>
+      {% if can_manage %}
+      <td>
+        <form method="post" action="{{ url_for('stock.move', product_id=p.id) }}" class="d-flex gap-1 align-items-center">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <select class="form-select form-select-sm" name="kind" style="width:auto">
+            <option value="receipt">Add</option>
+            <option value="wastage">Wastage</option>
+            <option value="set">Set to</option>
+          </select>
+          <input class="form-control form-control-sm text-end" name="qty" type="number" step="any" min="0" placeholder="qty" style="width:80px" required>
+          <input class="form-control form-control-sm" name="lot_number" placeholder="lot" style="width:90px">
+          <input class="form-control form-control-sm" name="note" placeholder="note (optional)" style="width:130px">
+          <button class="btn btn-sm btn-primary py-0 px-2">Go</button>
+        </form>
+      </td>
+      {% endif %}
+      <td class="text-end"><a class="btn btn-sm btn-outline-secondary py-0 px-1" href="{{ url_for('stock.history', product_id=p.id) }}" title="History"><i class="bi bi-clock-history"></i></a></td>
+    </tr>
+  {% else %}<tr><td colspan="7" class="text-center text-muted py-4">No products match.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="small text-muted mt-2">Sales reduce stock automatically when an order is fulfilled. {{ products|length }} product(s) shown.</p>
+{% endblock %}

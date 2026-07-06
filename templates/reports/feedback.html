@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block heading %}Customer feedback{% endblock %}
+{% macro stars(r) %}<span style="color:#F9A03F">{% for n in range(1,6) %}{{ '★' if n <= r else '☆' }}{% endfor %}</span>{% endmacro %}
+{% block content %}
+{% include "reports/_nav.html" %}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div class="btn-group btn-group-sm">
+    {% for d in [30,90,180,365] %}
+    <a class="btn {{ 'btn-primary' if days==d else 'btn-outline-secondary' }}" href="{{ url_for('reports.feedback', days=d) }}">{{ d }} days</a>
+    {% endfor %}
+  </div>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('reports.feedback', days=days, export='csv') }}"><i class="bi bi-download"></i> CSV</a>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="rf-card p-3 text-center h-100">
+    <div class="text-muted small text-uppercase">Average</div>
+    <div class="h2 mb-0" style="color:#F9A03F">{% if avg is none %}—{% else %}{{ avg }}{% endif %}</div>
+    <div style="color:#F9A03F">{% if avg %}{{ stars(avg|round(0,'common')|int) }}{% endif %}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-card p-3 text-center h-100">
+    <div class="text-muted small text-uppercase">Orders rated</div>
+    <div class="h2 mb-0">{{ n }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-card p-3 text-center h-100">
+    <div class="text-muted small text-uppercase">5-star</div>
+    <div class="h2 mb-0" style="color:#2E7D32">{{ pct_great }}%</div></div></div>
+  <div class="col-6 col-lg-3"><div class="rf-card p-3 text-center h-100">
+    <div class="text-muted small text-uppercase">Poor (1–2★)</div>
+    <div class="h2 mb-0" style="color:#ED1C24">{{ pct_poor }}%</div></div></div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-7"><div class="rf-card p-3 h-100">
+    <h2 class="h6"><i class="bi bi-graph-up text-rf-orange"></i> Average rating by month</h2>
+    {% if month_labels %}<canvas id="trendChart" height="120"></canvas>
+    {% else %}<p class="text-muted small mt-3">Not enough data yet.</p>{% endif %}</div></div>
+  <div class="col-lg-5"><div class="rf-card p-3 h-100">
+    <h2 class="h6"><i class="bi bi-bar-chart text-rf-orange"></i> Score breakdown</h2>
+    {% if n %}<canvas id="distChart" height="160"></canvas>
+    {% else %}<p class="text-muted small mt-3">No ratings in this period.</p>{% endif %}</div></div>
+</div>
+
+<div class="rf-card p-3 mb-3">
+  <h2 class="h6 text-danger"><i class="bi bi-exclamation-triangle"></i> Low scores to follow up <span class="text-muted small fw-normal">(1–2★)</span></h2>
+  <div class="table-responsive">
+  <table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Date</th><th>Order</th><th>Customer</th><th>Rating</th><th>Comment</th></tr></thead>
+    <tbody>
+    {% for o in low %}
+      <tr class="table-danger">
+        <td class="small">{{ o.rated_at.strftime('%d %b %Y') }}</td>
+        <td><a href="{{ url_for('orders.detail', order_id=o.id) }}">{{ o.number }}</a></td>
+        <td class="small">{{ o.customer.name if o.customer else '—' }}</td>
+        <td>{{ stars(o.rating) }}</td>
+        <td class="small">{{ o.rating_comment or '—' }}</td>
+      </tr>
+    {% else %}<tr><td colspan="5" class="text-center text-muted py-3">No low scores in this period. </td></tr>{% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<div class="rf-card p-3">
+  <h2 class="h6"><i class="bi bi-chat-quote text-rf-orange"></i> Recent comments</h2>
+  <ul class="list-group list-group-flush mb-0">
+    {% for o in comments %}
+    <li class="list-group-item px-0 py-2">
+      {{ stars(o.rating) }} <span class="small text-muted">· {{ o.customer.name if o.customer else '' }} ·
+        <a href="{{ url_for('orders.detail', order_id=o.id) }}">{{ o.number }}</a> · {{ o.rated_at.strftime('%d %b %Y') }}</span>
+      <div class="small">“{{ o.rating_comment }}”</div>
+    </li>
+    {% else %}<li class="list-group-item px-0 text-muted small">No written comments in this period.</li>{% endfor %}
+  </ul>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script>
+const RF = {orange:'#F47A21', amber:'#F9A03F', green:'#2E7D32', red:'#ED1C24'};
+(function(){
+  const ctx=document.getElementById('trendChart'); if(!ctx) return;
+  new Chart(ctx,{type:'line',data:{labels:{{ month_labels|tojson }},
+    datasets:[{data:{{ month_avg|tojson }},borderColor:RF.amber,backgroundColor:'rgba(249,160,63,0.12)',fill:true,tension:0.3,borderWidth:2,pointRadius:3}]},
+    options:{plugins:{legend:{display:false}},scales:{y:{suggestedMin:0,suggestedMax:5,ticks:{stepSize:1}}}}});
+})();
+(function(){
+  const ctx=document.getElementById('distChart'); if(!ctx) return;
+  new Chart(ctx,{type:'bar',data:{labels:['1★','2★','3★','4★','5★'],
+    datasets:[{data:[{{ dist[1] }},{{ dist[2] }},{{ dist[3] }},{{ dist[4] }},{{ dist[5] }}],
+      backgroundColor:[RF.red,RF.red,RF.amber,RF.green,RF.green],borderRadius:3}]},
+    options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
+})();
+</script>
+{% endblock %}

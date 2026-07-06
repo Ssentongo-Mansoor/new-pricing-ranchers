@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{# Shell for all costing pages: loads the costing module's CSS/JS on top of the
+   pricing app frame, and provides the toast container its JS expects. #}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/costing.css') }}">
+<div class="toast-wrap" id="toastWrap"></div>
+{% block costing_content %}{% endblock %}
+<script src="{{ url_for('static', filename='js/costing.js') }}"></script>
+{% endblock %}

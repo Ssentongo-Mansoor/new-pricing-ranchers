@@ -1,0 +1,7 @@
+<p class="small mb-2">
+{% if tb.ok %}
+<span class="badge badge-ok">Ledger proof: debits {{ '{:,}'.format(tb.tdr) }} = credits {{ '{:,}'.format(tb.tcr) }} ✓</span>
+{% else %}
+<span class="badge badge-danger">LEDGER OUT OF BALANCE — {{ '{:,}'.format(tb.tdr) }} vs {{ '{:,}'.format(tb.tcr) }}. Stop and investigate.</span>
+{% endif %}
+</p>

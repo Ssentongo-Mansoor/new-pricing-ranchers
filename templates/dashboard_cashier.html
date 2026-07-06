@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block heading %}Till — {{ today.strftime('%A %d %B %Y') }}{% endblock %}
+{% block content %}
+
+<div class="rf-kpis" style="grid-template-columns:repeat(2,1fr)">
+  <div class="rf-kpi"><div class="num">{{ '{:,}'.format(total_today) }}</div>
+    <div class="lbl">Received today (UGX)</div></div>
+  <div class="rf-kpi"><div class="num">{{ receipts|length }}</div>
+    <div class="lbl">Receipts today</div></div>
+</div>
+
+<a class="btn btn-primary btn-lg mb-3" href="{{ url_for('accounting.receipt_new') }}">
+  <i class="bi bi-cash-coin"></i> Record a receipt</a>
+
+<div class="table-responsive rf-card">
+<table class="table table-sm table-hover align-middle mb-0">
+  <thead><tr><th>No</th><th>Customer</th><th>Method</th>
+    <th class="text-end">Received</th><th class="text-end">WHT</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for r in receipts %}
+    <tr class="{{ 'text-muted' if r.status == 'reversed' }}">
+      <td class="fw-semibold">{{ r.receipt_no }}</td>
+      <td class="small">{{ r.customer.name }}</td>
+      <td class="small">{{ r.METHODS.get(r.method) }}</td>
+      <td class="text-end">{{ r.currency }} {{ '{:,}'.format(r.amount_minor) }}</td>
+      <td class="text-end">{{ '{:,}'.format(r.wht_minor) if r.wht_minor else '' }}</td>
+      <td>{% if r.status == 'reversed' %}<span class="badge badge-danger">Reversed</span>
+          {% else %}<span class="badge badge-ok">Posted</span>{% endif %}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6" class="text-center text-muted py-4">No receipts yet today.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="small text-muted mt-2">A wrong receipt is fixed by the finance manager
+with a reversal — tell them the receipt number.</p>
+{% endblock %}

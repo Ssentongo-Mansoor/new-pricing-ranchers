@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block heading %}Messages{% endblock %}
+{% block content %}
+<p class="text-muted">Conversations with your customers. You see the customers assigned to you{% if current_user.can_fulfill or current_user.can_manage_all %} and all customers you handle{% endif %}.</p>
+<div class="table-responsive rf-card">
+<table class="table table-hover align-middle mb-0">
+  <thead><tr><th>Customer</th><th>Last message</th><th>When</th><th></th></tr></thead>
+  <tbody>
+  {% for t in threads %}
+    <tr class="{{ 'fw-semibold' if t.unread }}">
+      <td><a href="{{ url_for('messages.thread', customer_id=t.customer.id) }}">{{ t.customer.name }}</a>
+        {% if t.unread %}<span class="badge badge-danger">{{ t.unread }} new</span>{% endif %}</td>
+      <td class="small">{{ ('You: ' if t.last.sender_type=='staff' else '') }}{{ t.last.body[:70] }}{% if t.last.body|length>70 %}…{% endif %}</td>
+      <td class="small text-muted">{{ t.last.created_at.strftime('%d %b %H:%M') }}</td>
+      <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('messages.thread', customer_id=t.customer.id) }}">Open</a></td>
+    </tr>
+  {% else %}<tr><td colspan="4" class="text-center text-muted py-4">No customer messages yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% if customers %}
+<div class="rf-card p-3 mt-3" style="max-width:520px">
+  <h2 class="h6">Start a conversation</h2>
+  <form method="get" action="" onsubmit="this.action='/messages/'+this.customer_id.value; return true;">
+    <div class="input-group">
+      <select class="form-select" name="customer_id">
+        {% for c in customers %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-outline-primary">Open thread</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

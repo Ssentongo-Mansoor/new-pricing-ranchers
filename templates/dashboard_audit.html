@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block heading %}Audit desk{% endblock %}
+{% block content %}
+
+<div class="rf-hero">
+  <img class="rf-hero-logo" src="{{ url_for('static', filename='img/ranchers-logo.svg') }}" alt="">
+  {% set hr = now.hour %}
+  <h1>{{ 'Good morning' if hr < 12 else 'Good afternoon' if hr < 17 else 'Good evening' }}, {{ current_user.full_name.split(' ')[0] }}</h1>
+  <div class="sub">{{ today.strftime('%A %d %B %Y') }} · stock-take &amp; accuracy</div>
+</div>
+
+{% if open_counts or disc_recent or oos %}
+<div class="d-flex flex-column gap-2 mb-3">
+  {% if open_counts %}
+  <a class="text-decoration-none" href="{{ url_for('stock.counts') }}">
+    <div class="alert alert-warning d-flex align-items-center gap-2 mb-0 py-2"><i class="bi bi-pencil-square fs-5"></i>
+      <span><strong>{{ open_counts|length }}</strong> stock-take(s) in progress — finish and post them.</span></div></a>
+  {% endif %}
+  {% if disc_recent %}
+  <div class="alert alert-danger d-flex align-items-center gap-2 mb-0 py-2"><i class="bi bi-exclamation-diamond-fill fs-5"></i>
+    <span><strong>{{ disc_recent }}</strong> discrepancy line(s) found in recent counts — investigate.</span></div>
+  {% endif %}
+  {% if oos %}
+  <a class="text-decoration-none" href="{{ url_for('stock.report_oos') }}">
+    <div class="alert alert-secondary d-flex align-items-center gap-2 mb-0 py-2"><i class="bi bi-x-octagon fs-5"></i>
+      <span><strong>{{ oos|length }}</strong> product(s) currently show zero on hand.</span></div></a>
+  {% endif %}
+</div>
+{% else %}
+<div class="alert alert-success py-2 mb-3"><i class="bi bi-check2-circle"></i> No open counts or discrepancies flagged.</div>
+{% endif %}
+
+<div class="rf-kpis mb-3" style="grid-template-columns:repeat(5,1fr)">
+  <a href="{{ url_for('stock.counts') }}"><div class="rf-kpi"><div class="num" style="color:#F9A03F">{{ open_counts|length }}</div><div class="lbl">In progress</div></div></a>
+  <a href="{{ url_for('stock.counts') }}"><div class="rf-kpi"><div class="num">{{ this_month|length }}</div><div class="lbl">Counts this month</div></div></a>
+  <a href="{{ url_for('stock.counts') }}"><div class="rf-kpi"><div class="num" style="color:#ED1C24">{{ disc_recent }}</div><div class="lbl">Recent discrepancies</div></div></a>
+  <a href="{{ url_for('stock.report_oos') }}"><div class="rf-kpi"><div class="num" style="color:#ED1C24">{{ oos|length }}</div><div class="lbl">Out of stock now</div></div></a>
+  <div class="rf-kpi"><div class="num" style="font-size:1rem">{{ last_count.created_at.strftime('%d %b') if last_count else '—' }}</div><div class="lbl">Last count</div></div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-7"><div class="rf-card p-3 h-100">
+    <h2 class="h6"><i class="bi bi-bar-chart-line text-rf-orange"></i> Discrepancies per recent count</h2>
+    {% if chart_labels %}<canvas id="discChart" height="130"></canvas>
+    {% else %}<p class="text-muted small mt-3">No posted counts yet.</p>{% endif %}</div></div>
+  <div class="col-lg-5"><div class="rf-card p-3 h-100">
+    <h2 class="h6"><i class="bi bi-list-check text-rf-orange"></i> Biggest gaps — last count</h2>
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Item</th><th class="text-end">Sys</th><th class="text-end">Count</th><th class="text-end">Diff</th></tr></thead>
+      <tbody>
+      {% for d in top_disc %}
+        <tr><td class="small">{{ d.name }}</td>
+          <td class="text-end small">{{ '%g'|format(d.system or 0) }}</td>
+          <td class="text-end small">{{ '%g'|format(d.counted or 0) }}</td>
+          <td class="text-end fw-semibold {{ 'text-danger' if (d.diff or 0)<0 else 'text-success' }}">{{ '%+g'|format(d.diff or 0) }}</td></tr>
+      {% else %}<tr><td colspan="4" class="text-muted small">No discrepancies in the last count.</td></tr>{% endfor %}
+      </tbody>
+    </table></div></div>
+</div>
+
+<div class="rf-card p-3">
+  <h2 class="h6 d-flex justify-content-between"><span><i class="bi bi-clipboard-check text-rf-orange"></i> Recent stock-takes</span>
+    <a class="btn btn-sm btn-primary py-0" href="{{ url_for('stock.counts') }}"><i class="bi bi-plus-lg"></i> New count</a></h2>
+  <table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Date</th><th>Type</th><th>Status</th><th class="text-end">Lines</th><th class="text-end">Discrepancies</th></tr></thead>
+    <tbody>
+    {% for c in recent %}
+      <tr>
+        <td class="small">{{ c.created_at.strftime('%d %b %Y') if c.created_at else '—' }}</td>
+        <td class="small">{{ c.kind_label }}</td>
+        <td>{% if c.status=='open' %}<span class="badge badge-warn">in progress</span>{% else %}<span class="badge badge-ok">posted</span>{% endif %}</td>
+        <td class="text-end small">{{ c.lines|length }}</td>
+        <td class="text-end">{% set d = c.discrepancy_lines|length %}{% if d %}<span class="badge badge-danger">{{ d }}</span>{% else %}<span class="text-muted small">0</span>{% endif %}</td>
+      </tr>
+    {% else %}<tr><td colspan="5" class="text-center text-muted py-3">No stock-takes yet.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script>
+const RF = {orange:'#F47A21', red:'#ED1C24'};
+(function(){
+  const ctx=document.getElementById('discChart'); if(!ctx) return;
+  new Chart(ctx,{type:'bar',data:{labels:{{ chart_labels|tojson }},
+    datasets:[{data:{{ chart_values|tojson }},backgroundColor:RF.red,borderRadius:3}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{ticks:{maxTicksLimit:8}},y:{beginAtZero:true,ticks:{precision:0}}}}});
+})();
+</script>
+{% endblock %}

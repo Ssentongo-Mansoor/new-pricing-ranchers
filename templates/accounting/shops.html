@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block heading %}Own shops & stock transfers{% endblock %}
+{% block content %}
+
+<div class="rf-kpis" style="grid-template-columns:repeat({{ shops|length or 1 }},1fr)">
+  {% for l in shops %}
+  <a href="{{ url_for('accounting.shop_detail', loc_id=l.id) }}"><div class="rf-kpi">
+    <div class="num">{{ stock_by_shop[l.id]|length }}</div>
+    <div class="lbl">{{ l.name }}<br><span class="small">items in stock</span></div>
+  </div></a>
+  {% endfor %}
+</div>
+
+{% if can_link %}
+<div class="rf-card p-3 mb-3">
+  <h6>Internal customers</h6>
+  <p class="small text-muted mb-2">Link each shop to its customer record. A
+  linked customer's fulfilled orders become STOCK TRANSFERS — no invoice, no
+  revenue, no VAT. The sale posts from the shop's daily takings instead.</p>
+  {% for l in shops %}
+  <form method="post" action="{{ url_for('accounting.shop_link_customer') }}" class="d-flex gap-2 align-items-center mb-1">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="location_id" value="{{ l.id }}">
+    <span style="width:140px" class="small fw-semibold">{{ l.name }}</span>
+    <select class="form-select form-select-sm" name="customer_id" style="max-width:320px">
+      <option value="">— not linked (orders invoice normally) —</option>
+      {% for c in customers %}<option value="{{ c.id }}" {{ 'selected' if linked.get(l.id) and linked[l.id].id == c.id }}>{{ c.name }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-sm btn-outline-primary py-0 px-2">Save</button>
+  </form>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if can_transfer %}
+<div class="rf-card p-3 mb-3">
+  <h6>Direct transfer</h6>
+  <form method="post" action="{{ url_for('accounting.shop_transfer') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="d-flex gap-2 mb-2">
+      <select class="form-select form-select-sm" name="from_id" style="max-width:220px">
+        {% for l in locations %}<option value="{{ l.id }}">{{ l.name }}</option>{% endfor %}
+      </select>
+      <span class="align-self-center">→</span>
+      <select class="form-select form-select-sm" name="to_id" style="max-width:220px">
+        {% for l in locations %}<option value="{{ l.id }}" {{ 'selected' if loop.index == 2 }}>{{ l.name }}</option>{% endfor %}
+      </select>
+      <input class="form-control form-control-sm" name="notes" placeholder="note" style="max-width:260px">
+    </div>
+    {% for i in range(3) %}
+    <div class="d-flex gap-2 mb-1">
+      <select class="form-select form-select-sm" name="item_id" style="max-width:420px">
+        <option value="">— item —</option>
+        {% for it in items %}<option value="{{ it.id }}">{{ it.name }} ({{ it.stock_unit }})</option>{% endfor %}
+      </select>
+      <input class="form-control form-control-sm text-end" name="qty" placeholder="qty" style="max-width:110px">
+    </div>
+    {% endfor %}
+    <button class="btn btn-sm btn-primary mt-1">Post transfer</button>
+  </form>
+  <p class="small text-muted mb-0 mt-2">Use shop → plant for returns before
+  cancelling an internal order. Transfers post no journal — the goods stay on
+  the balance sheet, only the location moves.</p>
+</div>
+{% endif %}
+
+<div class="row">
+  <div class="col-md-6">
+    <div class="rf-card p-3 mb-3">
+      <h6>Recent transfers</h6>
+      <table class="table table-sm mb-0"><tbody>
+        {% for t in transfers %}
+        <tr><td class="fw-semibold">{{ t.transfer_no }}</td>
+          <td class="small">{{ t.transfer_date.strftime('%d %b') }}</td>
+          <td class="small">{{ t.from_location.name }} → {{ t.to_location.name }}</td>
+          <td class="small">{{ t.order.number if t.order else '' }}</td></tr>
+        {% else %}<tr><td class="text-muted text-center py-3">None yet.</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="rf-card p-3 mb-3">
+      <h6>Recent shop sales</h6>
+      <table class="table table-sm mb-0"><tbody>
+        {% for s in sales %}
+        <tr><td class="fw-semibold">{{ s.sale_no }}</td>
+          <td class="small">{{ s.sale_date.strftime('%d %b') }}</td>
+          <td class="small">{{ s.location.name }}</td>
+          <td class="text-end">{{ '{:,}'.format(s.gross_minor) }}</td></tr>
+        {% else %}<tr><td class="text-muted text-center py-3">None yet.</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+  </div>
+</div>
+{% endblock %}
