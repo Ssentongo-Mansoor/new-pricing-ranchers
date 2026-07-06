@@ -1278,10 +1278,33 @@ class Invoice(db.Model):
     efris = db.Column(db.String(40))
 
     customer = db.relationship("Customer")
+    lines = db.relationship("InvoiceLine", back_populates="invoice",
+                            cascade="all, delete-orphan",
+                            order_by="InvoiceLine.id")
 
     @property
     def is_outstanding(self):
         return self.payment_status in ("Not Paid", "Partially Paid", "In Payment")
+
+
+class InvoiceLine(db.Model):
+    """One product line of an imported invoice (Odoo itemized export,
+    6 Jul 2026). Amounts are NET (excl VAT) in the invoice currency, sign
+    already normalised (sales positive, credits negative). product_id is
+    matched from the Odoo product label via the curated sales_history
+    linkage where possible; the raw label is always kept."""
+    __tablename__ = "invoice_line"
+    id = db.Column(db.Integer, primary_key=True)
+    invoice_id = db.Column(db.Integer,
+                           db.ForeignKey("invoice.id", ondelete="CASCADE"),
+                           nullable=False, index=True)
+    product_name = db.Column(db.String(255), index=True)   # Odoo label, as exported
+    product_id = db.Column(db.Integer, db.ForeignKey("product.id"))  # matched, may be null
+    quantity = db.Column(db.Float)
+    amount = db.Column(db.Numeric(18, 2))                  # net, invoice currency
+
+    invoice = db.relationship("Invoice", back_populates="lines")
+    product = db.relationship("Product")
 
 
 class RepTarget(db.Model):

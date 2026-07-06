@@ -387,15 +387,29 @@ def _ceo_dashboard():
                     or l.description or "—"
                 prod_rev[nm] += float(l.line_total or 0) * rate
 
-    # Top products (last 3 months) from the linked monthly history (catalogue
-    # only). Post-history months have no product split until the line-item
-    # invoice export lands; the mix simply covers the history months.
+    # Top products (last 3 months): the monthly history pivot owns its months
+    # (catalogue only); itemized invoice lines own the months after it.
     for s in db.session.scalars(db.select(SalesHistory).where(SalesHistory.month.isnot(None))):
         idx = s.year * 12 + s.month
         if recent_lo <= idx <= target and idx <= hist_cutover:
             l = pmap.get(s.product_id)
             if l:
                 prod_rev[l] += float(s.revenue or 0)
+    if inv_cutover > hist_cutover:
+        from models import InvoiceLine
+        lo_idx = max(recent_lo, hist_cutover + 1)
+        lo_date = _i2d(lo_idx)
+        for d, pid, pname, amt in db.session.execute(
+                db.select(Invoice.invoice_date, InvoiceLine.product_id,
+                          InvoiceLine.product_name, InvoiceLine.amount)
+                .join(Invoice, Invoice.id == InvoiceLine.invoice_id)
+                .where(Invoice.invoice_date >= lo_date,
+                       Invoice.currency == "UGX",
+                       Invoice.payment_status != "Reversed")):
+            idx = d.year * 12 + d.month
+            if hist_cutover < idx <= min(target, inv_cutover):
+                label = pmap.get(pid) or pname or "—"
+                prod_rev[label] += float(amt or 0)
 
     # Main chart: daily month-to-date cumulative curve. Invoices carry daily
     # dates, so the current month draws from them; app orders add the days

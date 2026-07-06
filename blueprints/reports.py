@@ -149,14 +149,26 @@ def index():
                 for l in o.lines:
                     prodm[(l.description or l.article_no or "—")] += _money(l.line_total) * rate
 
-    # products this month: from the monthly history if the month is historical.
-    # Invoice months past the pivot have no product split until the line-item
-    # invoice export lands.
+    # products this month: from the monthly history pivot while the month is
+    # inside it, from the itemized invoice lines once past it.
+    ty, tm = (target - 1) // 12, (target - 1) % 12 + 1
     if target <= hist_cutover:
-        ty, tm = (target - 1) // 12, (target - 1) % 12 + 1
         for s in db.session.scalars(db.select(SalesHistory).where(
                 SalesHistory.year == ty, SalesHistory.month == tm)):
             prodm[s.product] += float(s.revenue or 0)
+    elif target <= cutover:
+        from models import InvoiceLine, Product as _P
+        _pl = {p.id: p.description for p in db.session.scalars(db.select(_P))}
+        m_start = date(ty, tm, 1)
+        for d, pid, pname, amt in db.session.execute(
+                db.select(Invoice.invoice_date, InvoiceLine.product_id,
+                          InvoiceLine.product_name, InvoiceLine.amount)
+                .join(Invoice, Invoice.id == InvoiceLine.invoice_id)
+                .where(Invoice.invoice_date >= m_start,
+                       Invoice.currency == "UGX",
+                       Invoice.payment_status != "Reversed")):
+            if d.year * 12 + d.month == target:
+                prodm[_pl.get(pid) or pname or "—"] += float(amt or 0)
 
     def mrev(idx):
         return hist_month[idx] if idx <= cutover else live_month[idx]
