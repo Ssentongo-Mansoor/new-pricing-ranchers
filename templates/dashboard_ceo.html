@@ -54,7 +54,7 @@
   <div class="col-lg-8">
     <div class="rf-card p-3 h-100">
       <h2 class="h6"><i class="bi bi-graph-up-arrow text-rf-orange"></i>
-        {% if chart_mode == 'mtd' %}Revenue — month to date ({{ rev.mtd_label }}) <span class="text-muted small fw-normal">· live, cumulative</span>
+        {% if chart_mode == 'mtd' %}Revenue — daily sales ({{ rev.mtd_label }}) <span class="text-muted small fw-normal">· net per day</span>
         {% else %}Revenue — recent months <span class="text-muted small fw-normal">· {{ rev.mtd_label }} so far (switches to daily once live)</span>{% endif %}</h2>
       <canvas id="trendChart" height="110"></canvas>
     </div>
@@ -212,11 +212,8 @@ const ugxTick = v => 'UGX ' + Number(v).toLocaleString();
   if (!ctx) return;
   const vals = {{ chart_values|tojson }};
   const mode = "{{ chart_mode }}";
-  const ds = (mode === 'months')
-    ? { type:'bar', data: vals, borderRadius:4,
-        backgroundColor: vals.map((_,i)=> i===vals.length-1 ? RF.orange : '#e7d9c6') }
-    : { type:'line', data: vals, borderColor: RF.orange,
-        backgroundColor:'rgba(244,122,33,0.12)', fill:true, tension:0.3, pointRadius:0, borderWidth:2 };
+  const ds = { type:'bar', data: vals, borderRadius:4,
+        backgroundColor: vals.map((_,i)=> i===vals.length-1 ? RF.orange : '#e7d9c6') };
   new Chart(ctx, {
     data: { labels: {{ chart_labels|tojson }}, datasets: [Object.assign({label:'Revenue (UGX)'}, ds)] },
     options: {

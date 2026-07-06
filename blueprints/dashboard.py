@@ -411,9 +411,10 @@ def _ceo_dashboard():
                 label = pmap.get(pid) or pname or "—"
                 prod_rev[label] += float(amt or 0)
 
-    # Main chart: daily month-to-date cumulative curve. Invoices carry daily
-    # dates, so the current month draws from them; app orders add the days
-    # beyond the latest invoice (their months are past inv_cutover).
+    # Main chart: sales PER DAY for the current month (Stephan, 6 Jul 2026 —
+    # was a cumulative curve). Invoices carry daily dates, so the current
+    # month draws from them; app orders add the days beyond the latest
+    # invoice (their months are past inv_cutover).
     mtd_days = [month_start + timedelta(days=i) for i in range((today - month_start).days + 1)]
     dser = {d: 0.0 for d in mtd_days}
     for d, v in inv_daily.items():
@@ -423,12 +424,10 @@ def _ceo_dashboard():
         idx = o.order_date.year * 12 + o.order_date.month
         if idx > inv_cutover and o.order_date in dser:
             dser[o.order_date] += _ugx(o)
-    running = 0.0
     chart_labels, chart_values = [], []
     for d in sorted(dser):
-        running += dser[d]
         chart_labels.append(d.strftime("%d %b"))
-        chart_values.append(round(running))
+        chart_values.append(round(dser[d]))
     chart_mode = "mtd"
     if not any(chart_values):
         # No activity yet this month: fall back to the 6-month bar view.
