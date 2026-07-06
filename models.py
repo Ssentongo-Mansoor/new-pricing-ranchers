@@ -279,8 +279,10 @@ class Product(db.Model):
     pack_size = db.Column(db.String(64))          # e.g. "1kg", "500G", "5 x 200 Gr"
     unit_of_measure = db.Column(db.String(16))    # e.g. "kg", "pack", "pcs"
     vat_applicable = db.Column(db.Boolean, default=False)  # only processed items carry VAT
-    # Cost floor (QA audit 5 Jul 2026): UGX cost per product unit. When set,
-    # services/cost_guard blocks any price entered below it. Null = no guard.
+    # Cost floor (QA audit 5 Jul 2026): UGX cost PER KG — all costing is per
+    # kg (the costing sheets produce cost/kg; pack selling prices derive from
+    # pack weight). services/cost_guard converts per pricelist line and blocks
+    # any price entered below the floor. Null = no guard.
     unit_cost = db.Column(db.Numeric(16, 4))
     stock_on_hand = db.Column(db.Float, default=0)         # current quantity in stock (product unit)
     low_stock_level = db.Column(db.Float, default=0)       # warn at or below this (0 = no warning)

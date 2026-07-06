@@ -156,7 +156,7 @@ def new():
             if price is None or price <= 0:
                 continue
             # Cost floor (QA audit 5 Jul 2026): opening prices obey it too.
-            err = below_cost_error(p, price, pl.currency)
+            err = below_cost_error(p, price, pl.currency, pack_size=p.pack_size)
             if err:
                 db.session.rollback()
                 flash(err, "danger")

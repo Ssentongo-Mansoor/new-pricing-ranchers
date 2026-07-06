@@ -401,8 +401,10 @@ def edit_price(line_id):
         return jsonify(ok=False, error="Not a number"), 400
 
     # Cost floor (QA audit 5 Jul 2026): refuse a price below the product cost.
+    # Cost is per kg; the line's pack size decides the price basis.
     from services.cost_guard import below_cost_error
-    err = below_cost_error(line.product, new_val, line.pricelist.currency)
+    err = below_cost_error(line.product, new_val, line.pricelist.currency,
+                           pack_size=line.pack_size or line.product.pack_size)
     if err:
         return jsonify(ok=False, error=err), 400
 
@@ -504,7 +506,8 @@ def _bulk_handler(pl, back_endpoint):
             # name the violations so the user fixes data, not guesses.
             from services.cost_guard import below_cost_error
             violations = [e for e in (
-                below_cost_error(line.product, new, pl.currency)
+                below_cost_error(line.product, new, pl.currency,
+                                 pack_size=line.pack_size or line.product.pack_size)
                 for line, lp, old, new in changes) if e]
             if violations:
                 for e in violations[:5]:

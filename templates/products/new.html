@@ -32,9 +32,9 @@
       <input class="form-check-input" type="checkbox" name="vat_applicable" value="1" id="vat">
       <label class="form-check-label" for="vat">Carries VAT (processed product). Leave unticked for VAT-exempt items.</label>
     </div>
-    <div class="mb-3"><label class="form-label">Unit cost (UGX, per unit above)</label>
+    <div class="mb-3"><label class="form-label">Cost per kg (UGX)</label>
       <input class="form-control" name="unit_cost" inputmode="decimal" value="{{ form.get('unit_cost','') }}" style="max-width:240px">
-      <div class="form-text">When set, prices below this cost are blocked everywhere. Leave blank for no cost floor.</div>
+      <div class="form-text">All costing is per kg. Pack prices are checked against cost/kg × pack weight. When set, below-cost prices are blocked everywhere. Leave blank for no cost floor.</div>
     </div>
 
     <div class="rf-card-soft border rounded p-3 mb-3">

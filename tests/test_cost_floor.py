@@ -6,9 +6,12 @@ Run against a COPY of the live database:
     SECRET_KEY=test DATABASE_URL=sqlite:////tmp/cf.db COOKIE_INSECURE=1 \
     python3 tests/test_cost_floor.py
 
-Proves:
-  1. below_cost_error: no cost set -> no guard; below cost -> error;
-     at cost -> allowed; discount counts against the floor.
+Proves (cost convention: unit_cost is UGX PER KG, price basis follows the
+line's pack size — per pack when the pack parses to a weight, per kg when the
+pack is "KG"/blank, unguarded when the basis is unknown):
+  1. below_cost_error: no cost -> no guard; below cost -> error; at cost ->
+     allowed; discount counts; pack prices compare against cost/kg x weight;
+     unknown pack basis stands aside; zero price is a placeholder, ignored.
   2. Inline pricelist price edit below cost returns 400 with the reason.
   3. Inline edit at/above cost still works.
   4. unit_cost column exists after boot (migration ladder).
@@ -48,31 +51,48 @@ with app.app_context():
     cols = {r[1] for r in db.session.execute(text("PRAGMA table_info(product)"))}
     check("product.unit_cost column exists", "unit_cost" in cols)
 
-    # Pick a UGX pricelist line with a price and a manageable product.
+    # Pick a UGX pricelist line with a price and a per-kg product, so the
+    # route checks below compare per kg (pack "KG"/blank).
     line = db.session.scalar(
-        db.select(PricelistLine).join(Pricelist)
+        db.select(PricelistLine).join(Pricelist).join(Product)
         .join(LinePrice, LinePrice.line_id == PricelistLine.id)
         .where(Pricelist.currency == "UGX", Pricelist.archived.is_(False),
-               LinePrice.amount.isnot(None)).limit(1))
+               LinePrice.amount.isnot(None),
+               db.func.lower(db.func.coalesce(PricelistLine.pack_size, "kg"))
+               .in_(("kg", ""))).limit(1))
     if line is None:
-        print("No priced UGX pricelist line found; cannot continue.")
+        print("No priced per-kg UGX pricelist line found; cannot continue.")
         sys.exit(2)
     product = line.product
     lp = next(p for p in line.prices if p.amount is not None)
     tier_key = lp.tier.key
 
-    # 1. Service-level behaviour.
+    # 1. Service-level behaviour (pack_size passed explicitly per line).
     product.unit_cost = None
-    check("no cost -> no guard", below_cost_error(product, 100, "UGX") is None)
-    product.unit_cost = 10000
-    check("below cost -> blocked",
-          below_cost_error(product, 9999, "UGX") is not None)
-    check("at cost -> allowed", below_cost_error(product, 10000, "UGX") is None)
-    check("above cost -> allowed", below_cost_error(product, 15000, "UGX") is None)
+    check("no cost -> no guard",
+          below_cost_error(product, 100, "UGX", pack_size="kg") is None)
+    product.unit_cost = 10000    # UGX per kg
+    check("per kg below cost -> blocked",
+          below_cost_error(product, 9999, "UGX", pack_size="kg") is not None)
+    check("per kg at cost -> allowed",
+          below_cost_error(product, 10000, "UGX", pack_size="kg") is None)
+    check("per kg above cost -> allowed",
+          below_cost_error(product, 15000, "UGX", pack_size="kg") is None)
     check("discount pushes below -> blocked",
-          below_cost_error(product, 11000, "UGX", discount_pct=15) is not None)
+          below_cost_error(product, 11000, "UGX", discount_pct=15,
+                           pack_size="kg") is not None)
     check("discount stays above -> allowed",
-          below_cost_error(product, 11000, "UGX", discount_pct=5) is None)
+          below_cost_error(product, 11000, "UGX", discount_pct=5,
+                           pack_size="kg") is None)
+    # Pack basis: floor for a 200g pack = 10,000 x 0.2 = 2,000.
+    check("200g pack below pack floor -> blocked",
+          below_cost_error(product, 1900, "UGX", pack_size="200g") is not None)
+    check("200g pack above pack floor -> allowed",
+          below_cost_error(product, 2100, "UGX", pack_size="200g") is None)
+    check("unknown basis (4PCS) -> unguarded",
+          below_cost_error(product, 1, "UGX", pack_size="4PCS") is None)
+    check("zero price is a placeholder -> ignored",
+          below_cost_error(product, 0, "UGX", pack_size="kg") is None)
     db.session.commit()
 
     admin_id = db.session.scalar(db.select(User.id).where(User.role == "admin"))

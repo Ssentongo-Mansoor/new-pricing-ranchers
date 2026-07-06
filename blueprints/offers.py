@@ -197,9 +197,11 @@ def add_line(offer_id):
             flash("Fixed price cannot be negative.", "danger")
             return redirect(url_for("offers.detail", offer_id=offer.id))
         # Cost floor (QA audit 5 Jul 2026): the effective fixed price (after
-        # the line discount) must not fall below the product cost.
+        # the line discount) must not fall below the product cost. Cost is per
+        # kg; the source line's pack size decides the price basis.
         from services.cost_guard import below_cost_error
-        err = below_cost_error(product, unit_price, offer.currency, discount)
+        err = below_cost_error(product, unit_price, offer.currency, discount,
+                               pack_size=src_line.pack_size or product.pack_size)
         if err:
             flash(err, "danger")
             return redirect(url_for("offers.detail", offer_id=offer.id))
