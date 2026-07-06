@@ -238,6 +238,35 @@ def home():
     if current_user.is_rep:
         return _rep_dashboard(orders, today)
 
+    # Invoiced sales from the accounting import (net of VAT and credit notes,
+    # reversed documents excluded). The invoice table is the running sales
+    # record from 1 Jul 2026; app orders show separately below it until the
+    # app itself becomes the invoicing source.
+    inv_stats = None
+    if current_user.sees_all_orders:
+        from models import Invoice
+        month_start = today.replace(day=1)
+        lo = min(month_start, week_ago)
+        inv_stats = {"today": defaultdict(float), "week": defaultdict(float),
+                     "mtd": defaultdict(float),
+                     "n_today": 0, "n_week": 0, "n_mtd": 0,
+                     "latest": db.session.scalar(db.select(db.func.max(Invoice.invoice_date)))}
+        for d, untaxed, ccy in db.session.execute(
+                db.select(Invoice.invoice_date, Invoice.untaxed, Invoice.currency)
+                .where(Invoice.invoice_date >= lo,
+                       Invoice.payment_status != "Reversed")):
+            v = float(untaxed or 0)
+            ccy = ccy or "UGX"
+            if d >= month_start:
+                inv_stats["mtd"][ccy] += v
+                inv_stats["n_mtd"] += 1
+            if d >= week_ago:
+                inv_stats["week"][ccy] += v
+                inv_stats["n_week"] += 1
+            if d == today:
+                inv_stats["today"][ccy] += v
+                inv_stats["n_today"] += 1
+
     return render_template(
         "dashboard.html", today=today,
         counts=counts, to_confirm=to_confirm, in_prep=in_prep,
@@ -246,7 +275,8 @@ def home():
         val_today=val_today, val_week=val_week, open_offers=open_offers,
         rate_alerts=rate_alerts, n_generic=len(generic), n_products=n_products,
         can_fulfill=current_user.can_fulfill, msg_threads=msg_threads,
-        delayed=delayed, crm_overdue=crm_overdue, crm_today=crm_today)
+        delayed=delayed, crm_overdue=crm_overdue, crm_today=crm_today,
+        inv_stats=inv_stats)
 
 
 def _ugx(o):

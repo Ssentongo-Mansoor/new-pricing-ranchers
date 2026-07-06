@@ -61,6 +61,17 @@
   <div class="col-lg-5">
     <div class="rf-card p-3 mb-3">
       <h2 class="h6">Sales</h2>
+      {% if inv_stats %}
+      <div class="fw-semibold small text-uppercase text-muted mt-1">Invoiced (net, excl VAT)</div>
+      <div class="d-flex justify-content-between"><span class="text-muted">Today ({{ inv_stats.n_today }} inv)</span>
+        <span class="money">{% for cur, v in inv_stats.today.items() %}{{ v|money(cur) }}{% if not loop.last %}, {% endif %}{% else %}—{% endfor %}</span></div>
+      <div class="d-flex justify-content-between"><span class="text-muted">Last 7 days ({{ inv_stats.n_week }} inv)</span>
+        <span class="money">{% for cur, v in inv_stats.week.items() %}{{ v|money(cur) }}{% if not loop.last %}, {% endif %}{% else %}—{% endfor %}</span></div>
+      <div class="d-flex justify-content-between"><span class="text-muted">Month to date ({{ inv_stats.n_mtd }} inv)</span>
+        <span class="money fw-semibold">{% for cur, v in inv_stats.mtd.items() %}{{ v|money(cur) }}{% if not loop.last %}, {% endif %}{% else %}—{% endfor %}</span></div>
+      <div class="form-text mb-1">Net of credit notes, reversed excluded. Invoices loaded to {{ inv_stats.latest.strftime('%d %b %Y') if inv_stats.latest else '—' }}.</div>
+      <div class="fw-semibold small text-uppercase text-muted mt-2">App orders</div>
+      {% endif %}
       <div class="d-flex justify-content-between"><span class="text-muted">Confirmed today</span>
         <span class="money">{% for cur, v in val_today.items() %}{{ v|money(cur) }}{% if not loop.last %}, {% endif %}{% else %}—{% endfor %}</span></div>
       <div class="d-flex justify-content-between"><span class="text-muted">Last 7 days ({{ n_week }} orders)</span>
