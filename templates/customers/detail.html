@@ -184,8 +184,8 @@
     <thead><tr><th>Invoice</th><th>Date</th><th>Salesperson</th><th class="text-end">Total</th><th>Payment</th></tr></thead>
     <tbody>
     {% for i in inv_recent %}
-      <tr>
-        <td class="small">{{ i.number }}</td>
+      <tr style="cursor:pointer" onclick="window.location='{{ url_for('customers.invoice_detail', inv_id=i.id) }}'">
+        <td class="small"><a href="{{ url_for('customers.invoice_detail', inv_id=i.id) }}">{{ i.number }}</a></td>
         <td class="small">{{ i.invoice_date.strftime('%d %b %Y') if i.invoice_date else '—' }}</td>
         <td class="small">{{ i.salesperson or '—' }}</td>
         <td class="text-end money">{{ '{:,.0f}'.format(i.total or 0) }} {{ i.currency }}</td>

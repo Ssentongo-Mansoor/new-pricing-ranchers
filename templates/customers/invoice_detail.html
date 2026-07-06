@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block heading %}{{ 'Credit note' if is_credit else 'Invoice' }} {{ inv.number }}{% endblock %}
+{% block content %}
+{% if inv.customer %}
+<a class="small" href="{{ url_for('customers.detail', customer_id=inv.customer_id) }}">← {{ inv.customer.name }}</a>
+{% endif %}
+
+<div class="rf-card p-4 mt-2" style="max-width:720px">
+  <div class="d-flex justify-content-between align-items-start flex-wrap">
+    <div>
+      <h2 class="h5 mb-1">{{ inv.number }}
+        {% if is_credit %}<span class="badge bg-secondary align-middle">Credit note</span>{% endif %}
+      </h2>
+      <div class="text-muted small">{{ inv.customer_name or (inv.customer.name if inv.customer) or '—' }}
+        {% if inv.company_type %} · {{ inv.company_type }}{% endif %}</div>
+    </div>
+    <div>
+      {% if inv.payment_status == 'Paid' %}<span class="badge badge-ok">paid</span>
+      {% elif inv.payment_status in ['Not Paid','Partially Paid','In Payment'] %}<span class="badge badge-warn">{{ inv.payment_status|lower }}</span>
+      {% elif inv.payment_status == 'Reversed' %}<span class="badge bg-secondary">reversed</span>
+      {% else %}<span class="small text-muted">{{ inv.payment_status or '—' }}</span>{% endif %}
+    </div>
+  </div>
+
+  <div class="row mt-3">
+    <div class="col-sm-6">
+      <table class="table table-sm mb-0">
+        <tr><th class="text-muted fw-normal" style="width:45%">Invoice date</th>
+            <td>{{ inv.invoice_date.strftime('%d %b %Y') if inv.invoice_date else '—' }}</td></tr>
+        <tr><th class="text-muted fw-normal">Due date</th>
+            <td>{{ inv.due_date.strftime('%d %b %Y') if inv.due_date else '—' }}</td></tr>
+        <tr><th class="text-muted fw-normal">Salesperson</th>
+            <td>{{ inv.salesperson or '—' }}</td></tr>
+        <tr><th class="text-muted fw-normal">EFRIS</th>
+            <td class="small">{{ inv.efris or '—' }}</td></tr>
+      </table>
+    </div>
+    <div class="col-sm-6">
+      <table class="table table-sm mb-0">
+        <tr><th class="text-muted fw-normal" style="width:45%">Untaxed</th>
+            <td class="text-end money">{{ '{:,.0f}'.format(inv.untaxed|float) if inv.untaxed is not none else '—' }} {{ inv.currency }}</td></tr>
+        <tr><th class="text-muted fw-normal">VAT</th>
+            <td class="text-end money">{{ '{:,.0f}'.format(vat) if vat is not none else '—' }} {{ inv.currency if vat is not none }}</td></tr>
+        <tr><th class="text-muted fw-normal">Total</th>
+            <td class="text-end money fw-semibold">{{ '{:,.0f}'.format(inv.total|float) if inv.total is not none else '—' }} {{ inv.currency }}</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="small text-muted mt-3">Imported from the accounting export — header only. Line items are not part of the import.</div>
+</div>
+
+{% if related %}
+<div class="rf-card p-4 mt-3" style="max-width:720px">
+  <h2 class="h6"><i class="bi bi-receipt-cutoff text-rf-orange"></i> Other recent documents for this customer</h2>
+  <div class="table-responsive">
+  <table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Number</th><th>Date</th><th class="text-end">Total</th><th>Payment</th></tr></thead>
+    <tbody>
+    {% for r in related %}
+      <tr style="cursor:pointer" onclick="window.location='{{ url_for('customers.invoice_detail', inv_id=r.id) }}'">
+        <td class="small"><a href="{{ url_for('customers.invoice_detail', inv_id=r.id) }}">{{ r.number }}</a></td>
+        <td class="small">{{ r.invoice_date.strftime('%d %b %Y') if r.invoice_date else '—' }}</td>
+        <td class="text-end money">{{ '{:,.0f}'.format(r.total|float) if r.total is not none else '—' }} {{ r.currency }}</td>
+        <td class="small">{{ r.payment_status or '—' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

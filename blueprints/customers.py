@@ -361,6 +361,39 @@ def detail(customer_id):
                            inv_count=inv_count, inv_outstanding=inv_outstanding)
 
 
+@bp.route("/invoice/<int:inv_id>")
+@login_required
+def invoice_detail(inv_id):
+    """One imported invoice or credit note, full header detail.
+
+    The Odoo export carries headers only (no line items), so this shows
+    everything the import has: dates, amounts, VAT, status, salesperson,
+    EFRIS. Access follows the customer: whoever may see the customer may
+    see their documents; unmatched documents need manage rights."""
+    from models import Invoice
+    inv = db.session.get(Invoice, inv_id)
+    if inv is None:
+        abort(404)
+    if inv.customer is not None:
+        assert_can_see_customer(current_user, inv.customer)
+    elif not current_user.can_manage_all:
+        abort(403)
+    is_credit = (inv.number or "").upper().startswith("RINV") or \
+        float(inv.total or 0) < 0
+    vat = None
+    if inv.total is not None and inv.untaxed is not None:
+        vat = float(inv.total) - float(inv.untaxed)
+    # Same customer, around the same date — quick context for the viewer.
+    related = []
+    if inv.customer_id:
+        related = db.session.scalars(
+            db.select(Invoice).where(Invoice.customer_id == inv.customer_id,
+                                     Invoice.id != inv.id)
+            .order_by(Invoice.invoice_date.desc()).limit(10)).all()
+    return render_template("customers/invoice_detail.html", inv=inv,
+                           is_credit=is_credit, vat=vat, related=related)
+
+
 ONBOARD_ROLES = ("rep", "telesales", "manager", "order_manager", "admin")
 
 
