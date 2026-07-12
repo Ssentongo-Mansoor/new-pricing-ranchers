@@ -109,6 +109,53 @@
     {% elif current_user.can_manage_all %}
     <div class="form-text mt-2"><i class="bi bi-geo-alt"></i> No map pin set. <a href="{{ url_for('customers.edit', customer_id=customer.id) }}">Add the location</a>.</div>
     {% endif %}
+  </div>
+
+  {# ----------------------------- Portal access ----------------------------- #}
+  <div class="rf-card p-4 mt-3">
+    <h2 class="h6"><i class="bi bi-person-badge text-rf-orange"></i> Portal access</h2>
+    {% if portal_user %}
+    <dl class="row mb-0 small">
+      <dt class="col-4">Username</dt><dd class="col-8"><code>{{ portal_user.username }}</code></dd>
+      <dt class="col-4">Status</dt>
+      <dd class="col-8">
+        {% if not portal_user.is_active %}<span class="badge bg-secondary">disabled</span>
+        {% elif portal_user.must_change_password %}<span class="badge badge-warn">awaiting first sign-in</span>
+        {% else %}<span class="badge badge-ok">active</span>{% endif %}
+      </dd>
+      <dt class="col-4">Last login</dt>
+      <dd class="col-8">{{ portal_user.last_login.strftime('%d %b %Y %H:%M') if portal_user.last_login else 'never' }}</dd>
+    </dl>
+    {% if portal_trail %}
+    <div class="small text-muted mt-2">
+      {% for e in portal_trail %}
+      <div><i class="bi {{ 'bi-envelope' if e.action == 'welcome_email' else 'bi-key' }}"></i>
+        {{ e.ts.strftime('%d %b %Y %H:%M') }} — {{ e.detail }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% if current_user.can_manage_all %}
+    <div class="d-flex flex-wrap gap-2 mt-3">
+      <form method="post" action="{{ url_for('customers.portal_resend_email', customer_id=customer.id) }}"
+            onsubmit="return confirm('Reset the temporary password and email new login details to {{ customer.email or 'the customer' }}?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-sm btn-outline-primary" {{ 'disabled' if not customer.email }}><i class="bi bi-envelope"></i> Resend welcome email</button></form>
+      <form method="post" action="{{ url_for('customers.portal_welcome_pdf', customer_id=customer.id) }}"
+            onsubmit="return confirm('Reset the temporary password and download the welcome sheet PDF?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-file-earmark-pdf"></i> Welcome sheet (PDF)</button></form>
+    </div>
+    <div class="form-text mt-1">Both actions issue a fresh temporary password; the customer sets their own at first sign-in.{% if not customer.email %} No email on the record — use the PDF, or add an email first.{% endif %}</div>
+    {% endif %}
+    {% else %}
+    <p class="small text-muted mb-2">No portal login yet for this account.</p>
+    {% if current_user.can_manage_all %}
+    <form method="post" action="{{ url_for('customers.portal_create', customer_id=customer.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-sm btn-primary"><i class="bi bi-person-plus"></i> Create portal login</button></form>
+    <div class="form-text mt-1">Creates the login and emails the welcome message with the temporary password{% if not customer.email %} (no email on record, so the credentials show on screen once){% endif %}.</div>
+    {% endif %}
+    {% endif %}
   </div></div>
   <div class="col-lg-7"><div class="rf-card p-4">
     {% set own = customer.pricelists|rejectattr('archived')|list %}

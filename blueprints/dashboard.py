@@ -340,13 +340,12 @@ def _ceo_dashboard():
     prod_rev = defaultdict(float)
 
     # Uploaded invoices (net UGX) own every month up to the latest invoice.
-    # TODO(H5): non-UGX invoices are dropped here. The Invoice model stores only
-    # a currency, no rate column, so converting historical foreign invoices needs
-    # a dated rate lookup per row. Left as UGX-only until an invoice rate is
-    # captured on import; live foreign orders are handled by net_ugx().
+    # H5 resolved 8 Jul 2026: the Odoo "Signed" amount columns are company
+    # currency (UGX) for every invoice, including USD ones — the currency
+    # column is informational only. No rate lookup needed; no currency filter.
     inv_daily = defaultdict(float)            # current-month daily curve
     for i in db.session.scalars(db.select(Invoice).where(
-            Invoice.currency == "UGX", Invoice.payment_status != "Reversed",
+            Invoice.payment_status != "Reversed",
             Invoice.invoice_date.isnot(None))):
         idx = i.invoice_date.year * 12 + i.invoice_date.month
         v = float(i.untaxed or 0)
@@ -404,7 +403,6 @@ def _ceo_dashboard():
                           InvoiceLine.product_name, InvoiceLine.amount)
                 .join(Invoice, Invoice.id == InvoiceLine.invoice_id)
                 .where(Invoice.invoice_date >= lo_date,
-                       Invoice.currency == "UGX",
                        Invoice.payment_status != "Reversed")):
             idx = d.year * 12 + d.month
             if hist_cutover < idx <= min(target, inv_cutover):
@@ -502,7 +500,6 @@ def _ceo_dashboard():
     # outstanding receivables (positive unpaid invoices, excl credit notes)
     outstanding_total = db.session.scalar(
         db.select(db.func.sum(Invoice.total)).where(
-            Invoice.currency == "UGX",
             Invoice.payment_status.in_(("Not Paid", "Partially Paid", "In Payment")),
             Invoice.total > 0)) or 0
 
@@ -658,7 +655,7 @@ def _rep_dashboard(orders, today):
     last_idx = {}
     if assigned_ids:
         for i in db.session.scalars(db.select(Invoice).where(
-                Invoice.customer_id.in_(assigned_ids), Invoice.currency == "UGX",
+                Invoice.customer_id.in_(assigned_ids),
                 Invoice.payment_status != "Reversed", Invoice.invoice_date.isnot(None))):
             idx = i.invoice_date.year * 12 + i.invoice_date.month
             v = float(i.untaxed or 0)

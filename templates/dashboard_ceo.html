@@ -46,7 +46,7 @@
   <a href="{{ url_for('orders.index') }}"><div class="rf-kpi"><div class="num" style="color:#ED1C24">{{ risk.delayed }}</div><div class="lbl">Delayed</div></div></a>
   <a href="{{ url_for('stock.report_oos') }}"><div class="rf-kpi"><div class="num" style="color:#ED1C24">{{ risk.oos }}</div><div class="lbl">Out of stock</div></div></a>
   <a href="{{ url_for('stock.index') }}"><div class="rf-kpi"><div class="num" style="color:#F9A03F">{{ risk.low }}</div><div class="lbl">Low stock</div></div></a>
-  <a href="{{ url_for('customers.index') }}"><div class="rf-kpi"><div class="num">{{ risk.new_customers }}</div><div class="lbl">New customers (MTD)</div></div></a>
+  <a href="{{ url_for('customers.index', since='mtd') }}"><div class="rf-kpi"><div class="num">{{ risk.new_customers }}</div><div class="lbl">New customers (MTD)</div></div></a>
 </div>
 
 <!-- Trend + channel mix -->

@@ -117,11 +117,10 @@ def index():
     hist_month, live_month = defaultdict(float), defaultdict(float)
     chan, custr, prodm = defaultdict(float), defaultdict(float), defaultdict(float)
 
-    # TODO(H5): non-UGX invoices are dropped (Invoice has no rate column, only a
-    # currency). Historical foreign invoices need a dated rate at import time to
-    # be included; live foreign orders are handled net by net_ugx().
+    # H5 resolved 8 Jul 2026: Odoo "Signed" amounts are company currency (UGX)
+    # for every invoice; the currency column is informational only.
     for i in db.session.scalars(db.select(Invoice).where(
-            Invoice.currency == "UGX", Invoice.payment_status != "Reversed",
+            Invoice.payment_status != "Reversed",
             Invoice.invoice_date.isnot(None))):
         idx = i.invoice_date.year * 12 + i.invoice_date.month
         val = float(i.untaxed or 0)
@@ -165,7 +164,6 @@ def index():
                           InvoiceLine.product_name, InvoiceLine.amount)
                 .join(Invoice, Invoice.id == InvoiceLine.invoice_id)
                 .where(Invoice.invoice_date >= m_start,
-                       Invoice.currency == "UGX",
                        Invoice.payment_status != "Reversed")):
             if d.year * 12 + d.month == target:
                 prodm[_pl.get(pid) or pname or "—"] += float(amt or 0)
@@ -345,7 +343,7 @@ def sales():
     # invoice headers -> total / customer / category / salesperson (net UGX)
     n_invoices = 0
     for i in db.session.scalars(db.select(Invoice).where(
-            Invoice.currency == "UGX", Invoice.payment_status != "Reversed",
+            Invoice.payment_status != "Reversed",
             Invoice.invoice_date.isnot(None))):
         if not (frm <= i.invoice_date <= to):
             continue
@@ -492,7 +490,7 @@ def sales_history():
         return render_template("reports/sales_history.html", has_data=False)
 
     def rev_of(i):
-        if i.currency == "UGX" and i.payment_status != "Reversed":
+        if i.payment_status != "Reversed":
             return float(i.untaxed or 0)
         return 0.0
 
@@ -518,8 +516,7 @@ def sales_history():
             total_rev += r
             if i.customer_id:
                 matched_rev += r
-        if (i.currency == "UGX"
-                and i.payment_status in ("Not Paid", "Partially Paid", "In Payment")
+        if (i.payment_status in ("Not Paid", "Partially Paid", "In Payment")
                 and float(i.total or 0) > 0):   # exclude credit notes
             t = float(i.total or 0)
             owe[i.customer_name] += t
@@ -607,7 +604,7 @@ def all_time():
     sp = defaultdict(float)
     n_inv = n_cn = 0
     cn_total = 0.0
-    for i in db.session.scalars(db.select(Invoice).where(Invoice.currency == "UGX")):
+    for i in db.session.scalars(db.select(Invoice)):
         if i.payment_status == "Reversed":
             continue
         v = float(i.untaxed or 0)
@@ -827,9 +824,9 @@ def customer_insights():
         # (invoices + credit notes) and product mix per year (from the pivot)
         from models import Invoice, SalesHistory
         for i in db.session.scalars(db.select(Invoice).filter_by(customer_id=selected.id)):
-            if i.currency == "UGX" and i.payment_status != "Reversed" and i.invoice_date:
+            if i.payment_status != "Reversed" and i.invoice_date:
                 hist_years[i.invoice_date.year] = hist_years.get(i.invoice_date.year, 0.0) + float(i.untaxed or 0)
-            if (i.currency == "UGX" and float(i.total or 0) > 0
+            if (float(i.total or 0) > 0
                     and i.payment_status in ("Not Paid", "Partially Paid", "In Payment")):
                 hist_outstanding += float(i.total or 0)
         hist_years = dict(sorted(hist_years.items()))

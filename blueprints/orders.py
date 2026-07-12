@@ -541,11 +541,13 @@ def stock_review(order_id):
             body += f"\n\n{note}"
         body += ("\n\nThe items we have in stock are being prepared for delivery now. "
                  "We will follow up on the balance.")
-        db.session.add(Message(
+        m = Message(
             customer_id=order.customer_id, sender_type="staff",
             sender_user_id=current_user.id,
             sender_name=getattr(current_user, "full_name", "Sales team"),
-            body=body, read_by_customer=False, read_by_staff=True))
+            body=body, order_id=order.id,
+            read_by_customer=False, read_by_staff=True)
+        db.session.add(m)
 
     # accept -> fulfilment
     order.status = "in_fulfillment"
@@ -562,14 +564,15 @@ def stock_review(order_id):
         state = "confirmed" if bo_action == "create_now" else "proposed"
         bo = _build_backorder(order, confirm_state=state)
         if bo is not None and bo_action == "ask_customer":
-            db.session.add(Message(
+            m = Message(
                 customer_id=order.customer_id, sender_type="staff",
                 sender_user_id=current_user.id,
                 sender_name=getattr(current_user, "full_name", "Sales team"),
                 body=(f"We have raised a proposed back order {bo.number} for the "
                       f"out-of-stock items on {order.number}. Please confirm in your "
                       f"portal whether you want us to deliver these when back in stock, "
-                      f"or decline.")))
+                      f"or decline."))
+            db.session.add(m)
 
     log("order_accept", "sales_order", order.id,
         detail=(f"{order.number} accepted by {current_user.full_name}; "
@@ -725,9 +728,10 @@ def complete(order_id):
         order.status = "cancelled"
         order.fulfilled_at = datetime.utcnow()
         bo = _build_backorder(order, confirm_state="proposed") if not opt_out else None
+        m = None
         if bo is not None:
             from models import Message
-            db.session.add(Message(
+            m = Message(
                 customer_id=order.customer_id, sender_type="staff",
                 sender_user_id=current_user.id,
                 sender_name=getattr(current_user, "full_name", "Sales team"),
@@ -735,7 +739,8 @@ def complete(order_id):
                       f"stock, so nothing could be delivered. We raised back order "
                       f"{bo.number} for the full quantity — confirm in your portal "
                       f"that you want it when back in stock, or let your rep know."),
-                order_id=bo.id, read_by_customer=False, read_by_staff=True))
+                order_id=bo.id, read_by_customer=False, read_by_staff=True)
+            db.session.add(m)
         log("order_fulfill", "sales_order", order.id,
             detail=f"{order.number} nothing in stock -> cancelled"
                    + (f", back order {bo.number}" if bo else ""))
@@ -805,9 +810,10 @@ def complete(order_id):
     # (order manager, telesales, rep) can confirm or decline it.
     make_bo = bool(order.outstanding_items()) and not opt_out
     bo = _build_backorder(order, confirm_state="proposed") if make_bo else None
+    bo_msg = None
     if bo is not None:
         from models import Message
-        db.session.add(Message(
+        bo_msg = Message(
             customer_id=order.customer_id, sender_type="staff",
             sender_user_id=current_user.id,
             sender_name=getattr(current_user, "full_name", "Sales team"),
@@ -815,7 +821,8 @@ def complete(order_id):
                   f"delivered in full, so we raised back order {bo.number} for the "
                   f"balance. Confirm in your portal that you want it delivered when "
                   f"back in stock, or let your rep know — we can confirm it for you."),
-            read_by_customer=False, read_by_staff=True))
+            read_by_customer=False, read_by_staff=True)
+        db.session.add(bo_msg)
     db.session.commit()
 
     # Fiscalize AFTER commit: the sale is safe in the books whatever URA says.

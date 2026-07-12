@@ -140,7 +140,11 @@ def run(path):
                 inv = Invoice(number=num, customer_id=cust_cache[cname],
                               customer_name=cname, invoice_date=d,
                               untaxed=_num(r[8]), total=_num(r[7]),
-                              currency="UGX")
+                              currency="UGX",
+                              # NULL fails the dashboards' != 'Reversed'
+                              # filter; default until the header export
+                              # supplies the real status.
+                              payment_status="Not Paid")
                 db.session.add(inv)
                 db.session.flush()
                 inv_by_number[num] = inv

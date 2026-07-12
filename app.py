@@ -56,6 +56,12 @@ def create_app(config_object=Config):
     register_portal_guard(app)
     register_errorhandlers(app)
 
+    # Message notification sweep: emails customers whose portal messages sit
+    # unread past the delay (services/notify.py). Piggybacks on traffic, at
+    # most once a minute; notify_sweep.py covers quiet hours via cron.
+    from services import notify
+    notify.register_sweep(app)
+
     @app.after_request
     def set_security_headers(resp):
         # Stop browsers guessing content types on served files, in particular
@@ -287,6 +293,13 @@ def _run_migrations():
                     conn.execute(text("ALTER TABLE user ADD COLUMN customer_id INTEGER"))
                 if "manager_id" not in ucols:
                     conn.execute(text("ALTER TABLE user ADD COLUMN manager_id INTEGER"))
+                if "must_change_password" not in ucols:
+                    conn.execute(text("ALTER TABLE user ADD COLUMN "
+                                      "must_change_password BOOLEAN NOT NULL DEFAULT 0"))
+            if "message" in insp.get_table_names():
+                mcols = {c["name"] for c in insp.get_columns("message")}
+                if "emailed_at" not in mcols:
+                    conn.execute(text("ALTER TABLE message ADD COLUMN emailed_at DATETIME"))
             if "sales_order" in insp.get_table_names():
                 ocols2 = {c["name"] for c in insp.get_columns("sales_order")}
                 if "lpo_filename" not in ocols2:

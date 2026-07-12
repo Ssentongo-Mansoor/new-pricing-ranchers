@@ -34,29 +34,88 @@ def _sales_managers():
 
 @bp.route("/users")
 def users():
-    users = db.session.scalars(db.select(User).order_by(User.full_name)).all()
-    return render_template("admin/users.html", users=users)
+    """Users split into three tabs: internal staff, customer portal logins,
+    and distributor portal logins (split on the linked customer's segment)."""
+    all_users = db.session.scalars(db.select(User).order_by(User.full_name)).all()
+    internal, customer_logins, distributor_logins = [], [], []
+    for u in all_users:
+        if u.role != "customer":
+            internal.append(u)
+        elif u.customer and (u.customer.segment or "customer") == "distributor":
+            distributor_logins.append(u)
+        else:
+            customer_logins.append(u)
+    tab = request.args.get("tab", "internal")
+    if tab not in ("internal", "customers", "distributors"):
+        tab = "internal"
+    return render_template("admin/users.html", internal=internal,
+                           customer_logins=customer_logins,
+                           distributor_logins=distributor_logins, tab=tab)
 
 
 @bp.route("/users/new", methods=["GET", "POST"])
 def user_new():
-    customers = db.session.scalars(db.select(Customer).order_by(Customer.name)).all()
+    """New-user form, context-aware per users tab. kind=internal offers staff
+    roles only; kind=customer/distributor locks the role to a portal login,
+    filters the account picker to the matching segment, and derives the
+    username from the account name."""
+    kind = (request.form.get("kind") if request.method == "POST"
+            else request.args.get("kind")) or "internal"
+    if kind not in ("internal", "customer", "distributor"):
+        kind = "internal"
+    cust_q = db.select(Customer).filter_by(archived=False).order_by(Customer.name)
+    if kind in ("customer", "distributor"):
+        rows = db.session.scalars(cust_q).all()
+        customers = [c for c in rows
+                     if ((c.segment or "customer") == "distributor") == (kind == "distributor")]
+    else:
+        customers = db.session.scalars(cust_q).all()
+
+    def form(msg=None, level="danger"):
+        if msg:
+            flash(msg, level)
+        return render_template("admin/user_edit.html", user=None, kind=kind,
+                               customers=customers, managers=_sales_managers())
+
     if request.method == "POST":
-        username = (request.form.get("username") or "").strip()
-        if db.session.scalar(db.select(User).filter_by(username=username)):
-            flash("That username is taken.", "danger")
-            return render_template("admin/user_edit.html", user=None, customers=customers, managers=_sales_managers())
         pw = request.form.get("password") or ""
         if len(pw) < 8:
-            flash("Password must be at least 8 characters.", "danger")
-            return render_template("admin/user_edit.html", user=None, customers=customers, managers=_sales_managers())
-        role = request.form.get("role", "rep")
+            return form("Password must be at least 8 characters.")
         link_cid = request.form.get("link_customer_id")
+        if kind in ("customer", "distributor"):
+            # Portal login: role locked, username derived from the account name.
+            from blueprints.customers import portal_username
+            if not link_cid:
+                return form(f"Choose the {kind} this login belongs to.")
+            c = db.session.get(Customer, int(link_cid))
+            if c is None:
+                return form(f"Choose the {kind} this login belongs to.")
+            seg = c.segment or "customer"
+            if (seg == "distributor") != (kind == "distributor"):
+                return form(f"'{c.name}' is not a {kind}.")
+            role = "customer"
+            username = portal_username(c.name)
+            full_name = (request.form.get("full_name") or c.contact_name
+                         or c.name).strip()
+            email = request.form.get("email") or c.email
+        else:
+            username = (request.form.get("username") or "").strip()
+            if not username:
+                return form("Username is required.")
+            if db.session.scalar(db.select(User).filter_by(username=username)):
+                return form("That username is taken.")
+            role = request.form.get("role", "rep")
+            if role == "customer":
+                return form("Portal logins are created from the Customer or "
+                            "Distributor tab, or automatically when the "
+                            "customer is created.")
+            full_name = (request.form.get("full_name") or username).strip()
+            email = request.form.get("email")
         u = User(username=username,
-                 full_name=(request.form.get("full_name") or username).strip(),
-                 email=request.form.get("email"),
+                 full_name=full_name,
+                 email=email,
                  role=role,
-                 can_edit=bool(request.form.get("can_edit")),
+                 can_edit=bool(request.form.get("can_edit")) if kind == "internal" else False,
                  is_active=bool(request.form.get("is_active")),
                  customer_id=(int(link_cid) if role == "customer" and link_cid else None),
                  password_hash=hash_password(pw))
@@ -64,17 +123,25 @@ def user_new():
         u.manager_id = int(mgr) if (role == "rep" and mgr) else None
         cust_ids = request.form.getlist("customers")
         u.assigned_customers = db.session.scalars(
-            db.select(Customer).filter(Customer.id.in_(cust_ids))).all() if cust_ids else []
+            db.select(Customer).filter(Customer.id.in_(cust_ids))).all() \
+            if (cust_ids and role != "customer") else []
         out_ids = request.form.getlist("portal_customers")
         u.portal_customers = db.session.scalars(
             db.select(Customer).filter(Customer.id.in_(out_ids))).all() \
             if (u.role == "customer" and out_ids) else []
+        if u.role == "customer":
+            u.must_change_password = True
         db.session.add(u)
         log("user_create", "user", None, detail=f"{username} ({u.role}, edit={u.can_edit})")
         db.session.commit()
+        if u.role == "customer":
+            flash(f"Login created: username '{username}'. The user sets their "
+                  "own password at first sign-in.", "success")
+            return redirect(url_for("admin.users",
+                                    tab="distributors" if kind == "distributor" else "customers"))
         flash("User created.", "success")
         return redirect(url_for("admin.users"))
-    return render_template("admin/user_edit.html", user=None, customers=customers, managers=_sales_managers())
+    return form()
 
 
 @bp.route("/users/<int:user_id>", methods=["GET", "POST"])
@@ -316,6 +383,7 @@ def settings():
 
 
 COMMS_KEYS = ("smtp_host", "smtp_port", "smtp_user", "smtp_pass", "smtp_from",
+              "smtp_reply_to",
               "sms_provider", "sms_api_key", "sms_username", "sms_sender")
 
 

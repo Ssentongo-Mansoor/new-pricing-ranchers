@@ -10,8 +10,139 @@ from models import (Customer, User, Pricelist, CustomerCategory, SalesOrder,
                     Offer, Message, Invoice)
 from services.security import (manager_required, admin_required,
                                assert_can_see_customer, can_see_customer,
-                               can_allocate_pricelists)
+                               can_allocate_pricelists, hash_password)
 from services.audit import log
+
+def _temp_password():
+    """Random 10-character temporary password, unambiguous alphabet (no 0/O,
+    1/l/I). Shown once to the creator; the user replaces it at first sign-in."""
+    import secrets
+    alphabet = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789"
+    return "".join(secrets.choice(alphabet) for _ in range(10))
+
+
+def portal_username(name):
+    """Derive the portal username from the account name: lowercase, dots for
+    spaces and symbols, numeric suffix on collisions. 'Cafe Javas' becomes
+    cafe.javas. Shared by auto-provisioning and the admin New-user form."""
+    import re
+    base = re.sub(r"[^a-z0-9]+", ".", (name or "").lower()).strip(".") or "customer"
+    base = base[:56]
+    username, n = base, 1
+    while db.session.scalar(db.select(User).filter_by(username=username)):
+        n += 1
+        username = f"{base}{n}"
+    return username
+
+
+def _provision_portal_login(c):
+    """Auto-create the portal login for a freshly created customer or
+    distributor: username derived from the name, random temporary password,
+    forced change at first sign-in. Returns (user, temp_password), or
+    (None, None) when the customer already carries a login. The password is
+    returned in clear exactly once so the creator sees it; only the hash is
+    stored. Caller commits."""
+    existing = db.session.scalar(
+        db.select(User).filter_by(customer_id=c.id, role="customer"))
+    if existing:
+        return None, None
+    username = portal_username(c.name)
+    temp_pw = _temp_password()
+    u = User(username=username,
+             full_name=(c.contact_name or c.name or username).strip(),
+             email=c.email,
+             role="customer",
+             can_edit=False,
+             is_active=True,
+             customer_id=c.id,
+             must_change_password=True,
+             password_hash=hash_password(temp_pw))
+    db.session.add(u)
+    log("user_create", "user", None,
+        detail=f"portal login {username} auto-created for {c.name}")
+    return u, temp_pw
+
+
+def _portal_user_for(c):
+    """The portal login linked to this customer, or None."""
+    return db.session.scalar(
+        db.select(User).filter_by(customer_id=c.id, role="customer"))
+
+
+def _reset_portal_password(u):
+    """Issue a fresh temporary password and re-arm the forced change.
+    Returns the new password in clear (shown/printed once)."""
+    temp_pw = _temp_password()
+    u.password_hash = hash_password(temp_pw)
+    u.must_change_password = True
+    log("portal_pw_reset", "user", u.id,
+        detail=f"temporary password reset for {u.username}")
+    return temp_pw
+
+
+def _send_welcome_email(c, u, temp_pw=None):
+    """Best-effort welcome email: username plus a signed 72-hour activation
+    link where the customer sets their own password. No password travels by
+    mail — spam filters flag credential mails, and the link is safer anyway.
+    (temp_pw is accepted for call-site compatibility; the printed welcome
+    sheet is the channel that carries a temporary password.)
+    Returns (ok, reason). Never raises; call AFTER commit so an SMTP failure
+    cannot roll back the customer."""
+    from services import comms
+    from services import settings as settings_svc
+    from services.security import make_activation_token
+    if u is None:
+        return (False, "no login created")
+    if not (c.email or "").strip():
+        return (False, "no email address on file")
+    company = settings_svc.get("company_name") or "Ranchers Finest"
+    root = request.url_root.rstrip("/")
+    activate_url = root + url_for("auth.activate", token=make_activation_token(u))
+    who = (c.contact_name or c.name or "").strip()
+    body = (
+        f"Dear {who},\n"
+        f"\n"
+        f"Welcome to {company}. Your customer portal account is ready.\n"
+        f"\n"
+        f"Username: {u.username}\n"
+        f"\n"
+        f"Activate your account and choose your own password here\n"
+        f"(the link works for 72 hours):\n"
+        f"{activate_url}\n"
+        f"\n"
+        f"For later sign-ins, the portal lives at {root}/login\n"
+        f"\n"
+        f"How the portal works\n"
+        f"1. My Pricelist — your agreed prices, always current.\n"
+        f"2. New Order — pick products and quantities, then submit. You\n"
+        f"   receive an order number and we confirm it.\n"
+        f"3. Orders — follow each order from confirmation to delivery and\n"
+        f"   download the order PDF.\n"
+        f"4. Messages — questions or changes on an order go here. We reply\n"
+        f"   in the portal.\n"
+        f"5. Account — change your password any time.\n"
+        f"\n"
+        f"The full guide is on the Help page inside the portal.\n"
+        f"Need a hand? Reply to this email or contact your sales\n"
+        f"representative.\n"
+        f"\n"
+        f"{company}\n"
+    )
+    from services.email_templates import portal_welcome_html
+    import os
+    from flask import current_app
+    html = portal_welcome_html(company, f"{root}/login", activate_url,
+                               u.username, who)
+    logo = os.path.join(current_app.static_folder, "img", "ranchers-logo.png")
+    ok, reason = comms.send_email(c.email,
+                                  f"Welcome to the {company} Customer Portal",
+                                  body, html=html,
+                                  inline_images={"rflogo": logo})
+    log("welcome_email", "user", u.id,
+        detail=f"welcome email to {c.email}: {'sent' if ok else reason}",
+        commit=True)
+    return ok, reason
+
 
 DEFAULT_CUSTOMER_CATEGORIES = [
     "Supermarket", "Hotel", "Restaurant", "Café", "Butchery", "Caterer",
@@ -151,9 +282,27 @@ def _active_customer_ids(months=6):
 @bp.route("/")
 @login_required
 def index():
+    from datetime import timedelta
     cat = request.args.get("category", type=int)
     show_archived = request.args.get("archived") == "1"
-    status = request.args.get("status", "active")   # active | inactive | all
+    # Filter on when the record became a customer: since=mtd (this month) or
+    # since=<days>. The dashboard's "New customers" tile links here with it.
+    since = request.args.get("since")
+    since_date = since_label = None
+    if since == "mtd":
+        today = date.today()
+        since_date = date(today.year, today.month, 1)
+        since_label = "new this month"
+    elif since:
+        try:
+            days = int(since)
+            since_date = date.today() - timedelta(days=days)
+            since_label = f"new in the last {days} days"
+        except ValueError:
+            pass
+    # New customers usually have no purchases yet, so the default 'active'
+    # pill would hide them — default to 'all' when the since filter is on.
+    status = request.args.get("status", "all" if since_date else "active")
     if status not in ("active", "inactive", "all"):
         status = "active"
     customers = db.session.scalars(db.select(Customer).order_by(Customer.name)).all()
@@ -164,6 +313,14 @@ def index():
     customers = [c for c in customers if bool(c.archived) == show_archived]
     if cat:
         customers = [c for c in customers if c.category_id == cat]
+    rep_id = request.args.get("rep", type=int)
+    if rep_id:
+        customers = [c for c in customers
+                     if any(r.id == rep_id for r in c.reps)]
+    if since_date:
+        customers = [c for c in customers
+                     if c.created_at and c.created_at.date() >= since_date]
+        customers.sort(key=lambda c: c.created_at, reverse=True)
 
     active_ids = _active_customer_ids(6)
     n_active = sum(1 for c in customers if c.id in active_ids)
@@ -173,11 +330,17 @@ def index():
     elif status == "inactive":
         customers = [c for c in customers if c.id not in active_ids]
 
+    rep_users = db.session.scalars(
+        db.select(User).filter(User.is_active.is_(True),
+                               User.role.in_(("rep", "sales_manager", "telesales")))
+        .order_by(User.full_name)).all()
     return render_template("customers/index.html", customers=customers, cat=cat,
                            categories=_categories(), show_archived=show_archived,
                            n_archived=n_archived, status=status,
                            n_active=n_active, n_inactive=n_inactive,
-                           active_ids=active_ids)
+                           active_ids=active_ids, since=since,
+                           since_date=since_date, since_label=since_label,
+                           rep_id=rep_id, rep_users=rep_users)
 
 
 def _filtered_for_export():
@@ -192,7 +355,8 @@ def _filtered_for_export():
     rows = db.session.scalars(db.select(Customer).order_by(Customer.name)).all()
     if not (current_user.can_manage_all or current_user.is_order_manager):
         rows = [c for c in rows if can_see_customer(current_user, c)]
-    rows = [c for c in rows if not c.archived]
+    if request.args.get("archived") != "1":
+        rows = [c for c in rows if not c.archived]
     if segment in ("customer", "distributor"):
         rows = [c for c in rows if (c.segment or "customer") == segment]
     if cat:
@@ -241,6 +405,7 @@ def export_xlsx():
 @bp.route("/distributors")
 @login_required
 def distributors():
+    from datetime import timedelta
     show_archived = request.args.get("archived") == "1"
     rows = db.session.scalars(
         db.select(Customer).filter_by(segment="distributor").order_by(Customer.name)).all()
@@ -248,8 +413,30 @@ def distributors():
         rows = [c for c in rows if can_see_customer(current_user, c)]
     n_archived = sum(1 for c in rows if c.archived)
     rows = [c for c in rows if bool(c.archived) == show_archived]
+    rep_id = request.args.get("rep", type=int)
+    if rep_id:
+        rows = [c for c in rows if any(r.id == rep_id for r in c.reps)]
+    since = request.args.get("since")
+    since_date = None
+    if since == "mtd":
+        today = date.today()
+        since_date = date(today.year, today.month, 1)
+    elif since:
+        try:
+            since_date = date.today() - timedelta(days=int(since))
+        except ValueError:
+            pass
+    if since_date:
+        rows = [c for c in rows
+                if c.created_at and c.created_at.date() >= since_date]
+        rows.sort(key=lambda c: c.created_at, reverse=True)
+    rep_users = db.session.scalars(
+        db.select(User).filter(User.is_active.is_(True),
+                               User.role.in_(("rep", "sales_manager", "telesales")))
+        .order_by(User.full_name)).all()
     return render_template("customers/distributors.html", distributors=rows,
-                           show_archived=show_archived, n_archived=n_archived)
+                           show_archived=show_archived, n_archived=n_archived,
+                           rep_id=rep_id, rep_users=rep_users, since=since)
 
 
 @bp.route("/<int:customer_id>/archive", methods=["POST"])
@@ -348,8 +535,20 @@ def detail(customer_id):
     inv_count = len(invs)
     inv_outstanding = sum(
         float(i.total or 0) for i in invs
-        if i.currency == "UGX" and float(i.total or 0) > 0
+        if float(i.total or 0) > 0
         and i.payment_status in ("Not Paid", "Partially Paid", "In Payment"))
+
+    # Portal access: linked login plus the welcome-email / password-reset trail
+    from models import AuditLog
+    portal_user = _portal_user_for(c)
+    portal_trail = []
+    if portal_user:
+        portal_trail = db.session.scalars(
+            db.select(AuditLog)
+            .where(AuditLog.entity_type == "user",
+                   AuditLog.entity_id == portal_user.id,
+                   AuditLog.action.in_(("welcome_email", "portal_pw_reset")))
+            .order_by(AuditLog.ts.desc()).limit(5)).all()
 
     return render_template("customers/detail.html", customer=c,
                            visit_outcomes=VISIT_OUTCOMES, call_outcomes=CALL_OUTCOMES,
@@ -358,7 +557,8 @@ def detail(customer_id):
                            can_allocate=can_allocate_pricelists(current_user),
                            hist_years=hist_years, hist_top=hist_top,
                            hist_returns=hist_returns, inv_recent=inv_recent,
-                           inv_count=inv_count, inv_outstanding=inv_outstanding)
+                           inv_count=inv_count, inv_outstanding=inv_outstanding,
+                           portal_user=portal_user, portal_trail=portal_trail)
 
 
 @bp.route("/invoice/<int:inv_id>")
@@ -419,11 +619,26 @@ def onboard():
         if not c.reps:
             c.reps = [current_user]
         db.session.add(c)
+        db.session.flush()
+        login, temp_pw = _provision_portal_login(c)
         log("customer_onboard", "customer", None,
             detail=f"{c.name} registered by {current_user.full_name} (pending allocation)")
         db.session.commit()
+        extra = ""
+        if login:
+            sent, reason = _send_welcome_email(c, login, temp_pw)
+            if sent:
+                extra = (f" Portal login '{login.username}' created and the "
+                         f"welcome email with the login details was sent to "
+                         f"{c.email}.")
+            else:
+                extra = (f" Portal login: username '{login.username}', "
+                         f"temporary password '{temp_pw}'. Shown once only — "
+                         f"pass both to the customer yourself (email not "
+                         f"sent: {reason}). They set their own password at "
+                         "first sign-in.")
         flash("Customer registered. The Pricing Officer will allocate a pricelist and "
-              "approve the credit terms before ordering.", "success")
+              f"approve the credit terms before ordering.{extra}", "success")
         return redirect(url_for("customers.detail", customer_id=c.id))
     return render_template("customers/edit.html", customer=None, reps=_reps(),
                            pricelist_groups=_grouped_generic(), categories=_categories(),
@@ -467,6 +682,80 @@ def approve_onboarding(customer_id):
     return redirect(url_for("customers.detail", customer_id=c.id))
 
 
+@bp.route("/<int:customer_id>/portal/resend-email", methods=["POST"])
+@login_required
+@manager_required
+def portal_resend_email(customer_id):
+    """Reset the temporary password and resend the welcome email."""
+    c = db.session.get(Customer, customer_id)
+    if c is None:
+        abort(404)
+    u = _portal_user_for(c)
+    if u is None:
+        flash("No portal login exists for this account yet.", "warning")
+        return redirect(url_for("customers.detail", customer_id=c.id))
+    temp_pw = _reset_portal_password(u)
+    db.session.commit()
+    sent, reason = _send_welcome_email(c, u)
+    if sent:
+        flash(f"Fresh welcome email sent to {c.email} with a new activation "
+              "link. Earlier links no longer work.", "success")
+    else:
+        flash(f"Password was reset but the email was not sent ({reason}). "
+              f"Temporary password for '{u.username}': '{temp_pw}'. "
+              "Shown once only.", "warning")
+    return redirect(url_for("customers.detail", customer_id=c.id))
+
+
+@bp.route("/<int:customer_id>/portal/welcome.pdf", methods=["POST"])
+@login_required
+@manager_required
+def portal_welcome_pdf(customer_id):
+    """Reset the temporary password and download the welcome sheet PDF with
+    the fresh credentials and the short portal guide."""
+    from flask import Response
+    from services import exports
+    c = db.session.get(Customer, customer_id)
+    if c is None:
+        abort(404)
+    u = _portal_user_for(c)
+    if u is None:
+        flash("No portal login exists for this account yet.", "warning")
+        return redirect(url_for("customers.detail", customer_id=c.id))
+    temp_pw = _reset_portal_password(u)
+    db.session.commit()
+    portal_url = request.url_root.rstrip("/") + "/login"
+    data = exports.portal_welcome_pdf(c, u, temp_pw, portal_url)
+    from werkzeug.utils import secure_filename
+    fname = secure_filename(f"Portal_Access_{c.name}.pdf") or "Portal_Access.pdf"
+    return Response(data, mimetype="application/pdf",
+                    headers={"Content-Disposition": f"attachment; filename={fname}"})
+
+
+@bp.route("/<int:customer_id>/portal/create", methods=["POST"])
+@login_required
+@manager_required
+def portal_create(customer_id):
+    """Create the portal login for an account that predates auto-provisioning."""
+    c = db.session.get(Customer, customer_id)
+    if c is None:
+        abort(404)
+    if _portal_user_for(c):
+        flash("This account already has a portal login.", "warning")
+        return redirect(url_for("customers.detail", customer_id=c.id))
+    login, temp_pw = _provision_portal_login(c)
+    db.session.commit()
+    sent, reason = _send_welcome_email(c, login, temp_pw)
+    if sent:
+        flash(f"Portal login '{login.username}' created and the welcome email "
+              f"was sent to {c.email}.", "success")
+    else:
+        flash(f"Portal login created: username '{login.username}', temporary "
+              f"password '{temp_pw}'. Shown once only (email not sent: "
+              f"{reason}).", "warning")
+    return redirect(url_for("customers.detail", customer_id=c.id))
+
+
 @bp.route("/new", methods=["GET", "POST"])
 @login_required
 @manager_required
@@ -475,9 +764,24 @@ def new():
         c = Customer()
         _save_fields(c, request.form)
         db.session.add(c)
+        db.session.flush()
+        login, temp_pw = _provision_portal_login(c)
         log("customer_create", "customer", None, detail=c.name)
         db.session.commit()
-        flash("Customer created.", "success")
+        if login:
+            sent, reason = _send_welcome_email(c, login, temp_pw)
+            if sent:
+                flash(f"Customer created. Portal login '{login.username}' "
+                      f"created and the welcome email with the login details "
+                      f"was sent to {c.email}.", "success")
+            else:
+                flash(f"Customer created. Portal login: username "
+                      f"'{login.username}', temporary password '{temp_pw}'. "
+                      f"Shown once only — pass both to the customer yourself "
+                      f"(email not sent: {reason}). They set their own "
+                      "password at first sign-in.", "warning")
+        else:
+            flash("Customer created.", "success")
         return redirect(url_for("customers.detail", customer_id=c.id))
     return render_template("customers/edit.html", customer=None, reps=_reps(),
                            pricelist_groups=_grouped_generic(), categories=_categories(),
@@ -494,9 +798,24 @@ def distributor_new():
         c = Customer()
         _save_fields(c, request.form, force_segment="distributor")
         db.session.add(c)
+        db.session.flush()
+        login, temp_pw = _provision_portal_login(c)
         log("customer_create", "customer", None, detail=f"distributor {c.name}")
         db.session.commit()
-        flash("Distributor created.", "success")
+        if login:
+            sent, reason = _send_welcome_email(c, login, temp_pw)
+            if sent:
+                flash(f"Distributor created. Portal login '{login.username}' "
+                      f"created and the welcome email with the login details "
+                      f"was sent to {c.email}.", "success")
+            else:
+                flash(f"Distributor created. Portal login: username "
+                      f"'{login.username}', temporary password '{temp_pw}'. "
+                      f"Shown once only — pass both to the distributor "
+                      f"yourself (email not sent: {reason}). They set their "
+                      "own password at first sign-in.", "warning")
+        else:
+            flash("Distributor created.", "success")
         return redirect(url_for("customers.detail", customer_id=c.id))
     return render_template("customers/edit.html", customer=None, reps=_reps(),
                            pricelist_groups=_grouped_generic(), categories=_categories(),

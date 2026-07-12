@@ -269,6 +269,16 @@ def order_new():
 @bp.route("/order/<int:order_id>")
 def order(order_id):
     o = _get_my_order(order_id)
+    # Opening the order counts as reading its messages (clears the unread
+    # badge and re-arms the one-email-per-unread-batch notification throttle).
+    changed = False
+    for m in db.session.scalars(
+            db.select(Message).filter_by(order_id=o.id, sender_type="staff")):
+        if not m.read_by_customer:
+            m.read_by_customer = True
+            changed = True
+    if changed:
+        db.session.commit()
     rows = []
     if o.status == "draft":
         src = o.source_pricelist
@@ -462,11 +472,22 @@ def account():
         elif new != (request.form.get("confirm_password") or ""):
             flash("Passwords do not match.", "danger")
         else:
+            was_forced = bool(getattr(current_user, "must_change_password", False))
             current_user.password_hash = hash_password(new)
+            current_user.must_change_password = False
             db.session.commit()
+            log("password_change", "user", current_user.id, commit=True)
             flash("Password updated.", "success")
+            if was_forced:
+                return redirect(url_for("portal.home"))
         return redirect(url_for("portal.account"))
     return render_template("portal/account.html")
+
+
+@bp.route("/guide")
+def guide():
+    """Short operations manual for the portal (also sent in the welcome email)."""
+    return render_template("portal/guide.html")
 
 
 def _parse_date(s):

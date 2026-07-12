@@ -94,6 +94,9 @@ class User(UserMixin, db.Model):
     last_login = db.Column(db.DateTime)
     failed_attempts = db.Column(db.Integer, default=0)
     locked_until = db.Column(db.DateTime)
+    # Auto-provisioned portal logins start with the default password and must
+    # set their own before using the app (enforced app-wide in auth).
+    must_change_password = db.Column(db.Boolean, nullable=False, default=False)
 
     assigned_customers = db.relationship(
         "Customer", secondary=customer_reps, back_populates="reps"
@@ -216,9 +219,11 @@ class User(UserMixin, db.Model):
 
     @property
     def sees_all_customers(self):
-        """Roles that work the whole customer base (not just assigned)."""
+        """Roles that work the whole customer base (not just assigned).
+        The CFO reads the whole base like they read every order —
+        oversight, not workflow (added 8 Jul 2026)."""
         return self.role in ("admin", "ceo", "manager", "order_manager", "telesales",
-                             "pricing_officer", "sales_director")
+                             "pricing_officer", "sales_director", "cfo")
 
     @property
     def can_fulfill(self):
@@ -973,6 +978,10 @@ class Message(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     read_by_customer = db.Column(db.Boolean, default=False)
     read_by_staff = db.Column(db.Boolean, default=False)
+    # When this staff message was covered by a notification email (sent or
+    # folded into one). NULL = not yet notified; the sweep in services/notify
+    # emails messages still unread ~10 minutes after creation.
+    emailed_at = db.Column(db.DateTime)
 
     customer = db.relationship("Customer")
     order = db.relationship("SalesOrder")

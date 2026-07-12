@@ -812,3 +812,78 @@ def _wb_bytes(wb):
     wb.save(buf)
     buf.seek(0)
     return buf.read()
+
+
+def portal_welcome_pdf(customer, user, temp_pw, portal_url):
+    """One-page welcome sheet for a portal login: credentials plus the short
+    operations guide. Called with a freshly reset temporary password — the
+    stored hash can never be printed, so generating this sheet always goes
+    together with a password reset."""
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            title=f"Portal access - {customer.name}",
+                            leftMargin=14 * mm, rightMargin=14 * mm,
+                            topMargin=10 * mm, bottomMargin=14 * mm)
+    styles = getSampleStyleSheet()
+    elements = []
+    _doc_header(elements, styles, "CUSTOMER PORTAL ACCESS", customer.name)
+
+    acc_rows = [("Account", f"<b>{customer.name}</b>"),
+                ("Contact", customer.contact_name),
+                ("Email", customer.email), ("Phone", customer.phone)]
+    login_rows = [("Portal", f"<b>{portal_url}</b>"),
+                  ("Username", f"<b>{user.username}</b>"),
+                  ("Temp. password", f"<b>{temp_pw}</b>")]
+    info = Table([[_info_box("ACCOUNT", acc_rows, styles),
+                   _info_box("LOGIN DETAILS", login_rows, styles)]],
+                 colWidths=[90 * mm, 91 * mm])
+    info.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"),
+                              ("LEFTPADDING", (0, 0), (0, 0), 0),
+                              ("RIGHTPADDING", (1, 0), (1, 0), 0)]))
+    elements.append(info)
+    elements.append(Spacer(1, 4 * mm))
+
+    note = ParagraphStyle("pw_note", parent=styles["Normal"], fontSize=9,
+                          textColor=RF_CHARCOAL, leading=12)
+    h = ParagraphStyle("pw_h", parent=styles["Normal"], fontSize=10.5,
+                       textColor=RF_INK, fontName="Helvetica-Bold",
+                       spaceBefore=8, spaceAfter=2)
+    elements.append(Paragraph(
+        "Sign in with the details above. The portal asks you to set your own "
+        "password immediately; the temporary password stops working after "
+        "that. Keep this sheet confidential until then.", note))
+    elements.append(Spacer(1, 2 * mm))
+
+    elements.append(Paragraph("How the portal works", h))
+    for title, body in [
+        ("1. Your pricelist",
+         "My Pricelist shows your agreed prices. Prices update automatically "
+         "when new lists take effect, so what you see is always current."),
+        ("2. Placing an order",
+         "Click New Order, pick your products and quantities, and submit. "
+         "You receive an order number immediately and our team confirms the "
+         "order before it enters fulfilment. You may attach your own LPO."),
+        ("3. Tracking orders",
+         "The Home page lists your draft, current, and past orders with live "
+         "status from confirmation to delivery. Open any order for the "
+         "detail or the order PDF."),
+        ("4. Messages",
+         "Questions or changes on an order go through Messages. Our team "
+         "replies in the portal and you see a notification badge."),
+        ("5. Offers and promotions",
+         "Offers we issue to you appear on your Home page. Accepted offers "
+         "convert into orders. Running promotions show there too."),
+        ("6. Your account",
+         "Change your password any time under Account. A login serving "
+         "several outlets picks the outlet in the top bar when ordering."),
+    ]:
+        elements.append(Paragraph(f"<b>{title}</b> — {body}", note))
+        elements.append(Spacer(1, 1.5 * mm))
+
+    elements.append(Spacer(1, 2 * mm))
+    elements.append(Paragraph(
+        "Need help? Contact your sales representative or send us a message "
+        "in the portal.", note))
+    doc.build(elements)
+    buf.seek(0)
+    return buf.read()
