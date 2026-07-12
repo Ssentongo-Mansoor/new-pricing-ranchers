@@ -4,6 +4,7 @@ from flask import (Blueprint, render_template, request, redirect, url_for,
 from flask_login import login_required, current_user
 
 from datetime import date
+import unicodedata
 
 from extensions import db
 from models import (Customer, User, Pricelist, CustomerCategory, SalesOrder,
@@ -145,16 +146,23 @@ def _send_welcome_email(c, u, temp_pw=None):
 
 
 DEFAULT_CUSTOMER_CATEGORIES = [
-    "Supermarket", "Hotel", "Restaurant", "Café", "Butchery", "Caterer",
+    "Supermarket", "Hotel", "Restaurant", "Cafe", "Butchery", "Caterer",
     "Fast Food / QSR", "School / Institution", "Hospital", "Wholesaler",
     "Embassy / NGO", "Other",
 ]
 
 
+def _ascii_safe(value):
+    if not value:
+        return value
+    normalized = unicodedata.normalize("NFKD", str(value))
+    return "".join(ch for ch in normalized if not unicodedata.combining(ch))
+
+
 def ensure_customer_categories():
     if db.session.scalar(db.select(db.func.count(CustomerCategory.id))) == 0:
         for i, name in enumerate(DEFAULT_CUSTOMER_CATEGORIES):
-            db.session.add(CustomerCategory(name=name, sort_order=i))
+            db.session.add(CustomerCategory(name=_ascii_safe(name), sort_order=i))
         db.session.commit()
 
 
