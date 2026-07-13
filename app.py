@@ -143,49 +143,70 @@ EXPECTED_ACC_TRIGGERS = frozenset({
 
 
 def _install_acc_triggers():
-    """Apply migrations/acc_*.sql at every boot (idempotent), then verify.
-
-    SQLite only: the trigger files use SQLite RAISE(ABORT) syntax. On any
-    other backend (e.g. the advertised PostgreSQL switch) the integrity layer
-    does not exist yet, so accounting is refused rather than served without
-    its append-only guarantee. ACC_DB_INTEGRITY gates the accounting
-    blueprint's before_request.
+    """Apply the accounting integrity triggers at every boot (idempotent),
+    then verify. Two dialects carry the layer: SQLite (migrations/acc_0*.sql,
+    the original semantics) and PostgreSQL (migrations/pg/acc_pg_triggers.sql,
+    the PL/pgSQL port of 12 July 2026). Any other backend has no integrity
+    layer, so accounting is refused rather than served without its
+    append-only guarantee. ACC_DB_INTEGRITY gates the accounting blueprint's
+    before_request.
     """
     from flask import current_app
     import glob as _glob
+    from sqlalchemy import text
 
-    if db.engine.dialect.name != "sqlite":
+    dialect = db.engine.dialect.name
+    base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "migrations")
+
+    if dialect == "sqlite":
+        files = sorted(_glob.glob(os.path.join(base, "acc_0*.sql")))
+        if not files:
+            raise RuntimeError(
+                "migrations/acc_0*.sql not found; cannot install the accounting "
+                "integrity triggers. Refusing to start without them.")
+        # executescript handles the BEGIN..END trigger bodies that a naive
+        # split-on-semicolon would mangle. The files are idempotent
+        # (IF NOT EXISTS / DROP-then-CREATE), so this is safe on every boot.
+        raw = db.engine.raw_connection()
+        try:
+            cur = raw.cursor()
+            for path in files:
+                with open(path, encoding="utf-8") as fh:
+                    cur.executescript(fh.read())
+            raw.commit()
+        finally:
+            raw.close()
+        have = {r[0] for r in db.session.execute(text(
+            "SELECT name FROM sqlite_master WHERE type='trigger'"))}
+    elif dialect == "postgresql":
+        path = os.path.join(base, "pg", "acc_pg_triggers.sql")
+        if not os.path.exists(path):
+            raise RuntimeError(
+                "migrations/pg/acc_pg_triggers.sql not found; cannot install "
+                "the accounting integrity triggers. Refusing to start without "
+                "them.")
+        with open(path, encoding="utf-8") as fh:
+            script = fh.read()
+        # Raw cursor with NO parameters: the script contains literal '%'
+        # (RAISE EXCEPTION '%'), which psycopg2 would treat as a placeholder
+        # if any parameter object were passed. Dollar-quoted bodies survive.
+        raw = db.engine.raw_connection()
+        try:
+            cur = raw.cursor()
+            cur.execute(script)
+            raw.commit()
+        finally:
+            raw.close()
+        have = {r[0] for r in db.session.execute(text(
+            "SELECT tgname FROM pg_trigger WHERE NOT tgisinternal"))}
+    else:
         current_app.config["ACC_DB_INTEGRITY"] = False
         current_app.logger.error(
-            "Accounting integrity triggers are SQLite-only and this database "
-            "is %s. Accounting routes are DISABLED until the triggers are "
-            "ported to this backend (see migrations/acc_00*.sql).",
-            db.engine.dialect.name)
+            "Accounting integrity triggers exist for SQLite and PostgreSQL "
+            "only, and this database is %s. Accounting routes are DISABLED "
+            "until the triggers are ported to this backend.", dialect)
         return
 
-    base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "migrations")
-    files = sorted(_glob.glob(os.path.join(base, "acc_0*.sql")))
-    if not files:
-        raise RuntimeError(
-            "migrations/acc_0*.sql not found; cannot install the accounting "
-            "integrity triggers. Refusing to start without them.")
-
-    # executescript handles the BEGIN..END trigger bodies that a naive
-    # split-on-semicolon would mangle. The files are idempotent
-    # (IF NOT EXISTS / DROP-then-CREATE), so this is safe on every boot.
-    raw = db.engine.raw_connection()
-    try:
-        cur = raw.cursor()
-        for path in files:
-            with open(path, encoding="utf-8") as fh:
-                cur.executescript(fh.read())
-        raw.commit()
-    finally:
-        raw.close()
-
-    from sqlalchemy import text
-    have = {r[0] for r in db.session.execute(text(
-        "SELECT name FROM sqlite_master WHERE type='trigger'"))}
     missing = EXPECTED_ACC_TRIGGERS - have
     if missing:
         raise RuntimeError(
@@ -195,6 +216,30 @@ def _install_acc_triggers():
     current_app.config["ACC_DB_INTEGRITY"] = True
 
 
+class _DialectConn:
+    """Adapter for the migration ladder below: the ALTER statements are
+    written in SQLite flavour; on PostgreSQL this rewrites the three
+    incompatibilities ("user" is reserved and needs quoting, booleans take
+    FALSE not 0, and the DATETIME type is spelled TIMESTAMP)."""
+
+    def __init__(self, conn):
+        self._conn = conn
+        self._pg = db.engine.dialect.name == "postgresql"
+
+    def execute(self, clause):
+        from sqlalchemy import text as _text
+        if self._pg:
+            import re as _re
+            s = str(clause)
+            s = s.replace("ALTER TABLE user ", 'ALTER TABLE "user" ')
+            s = s.replace("BOOLEAN NOT NULL DEFAULT 0",
+                          "BOOLEAN NOT NULL DEFAULT FALSE")
+            s = s.replace("BOOLEAN DEFAULT 0", "BOOLEAN DEFAULT FALSE")
+            s = _re.sub(r"\bDATETIME\b", "TIMESTAMP", s)
+            clause = _text(s)
+        return self._conn.execute(clause)
+
+
 def _run_migrations():
     """Add columns introduced after a DB was first created (in-place upgrade)."""
     from sqlalchemy import inspect, text
@@ -202,7 +247,8 @@ def _run_migrations():
     if "pricelist" not in insp.get_table_names():
         return  # fresh DB; create_all (in caller) builds the current schema
     cols = {c["name"] for c in insp.get_columns("pricelist")}
-    with db.engine.begin() as conn:
+    with db.engine.begin() as _raw_conn:
+            conn = _DialectConn(_raw_conn)
             if "archived" not in cols:
                 conn.execute(text(
                     "ALTER TABLE pricelist ADD COLUMN archived BOOLEAN DEFAULT 0"))

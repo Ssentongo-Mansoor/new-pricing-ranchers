@@ -78,9 +78,8 @@ def seed_chart():
     for code, name, typ, postable, syskey, parent_code in CHART:
         if code in existing:
             continue
-        normalized_name = name.replace("—", "-").replace("–", "-")
-        acct = AccAccount(code=code, name=normalized_name, type=typ,
-                          is_postable=postable, system_key=syskey)
+        acct = AccAccount(code=code, name=name, type=typ, is_postable=postable,
+                          system_key=syskey)
         if parent_code and parent_code in by_code:
             acct.parent = by_code[parent_code]
         db.session.add(acct)
